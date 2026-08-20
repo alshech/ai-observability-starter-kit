@@ -1,5 +1,7 @@
 # AI Observability Starter Kit
 
+> **Featured on Microsoft Tech Community:** [AI Observability Starter Kit for Microsoft Foundry Agents](https://techcommunity.microsoft.com/blog/azure-ai-foundry-blog/ai-observability-starter-kit-for-microsoft-foundry-agents/4522751) - read the accompanying blog for an overview of the architecture, capabilities, and end-to-end experience.
+
 End-to-end reference implementation for observing, evaluating, and red-teaming AI agents on **Microsoft Foundry**. Provisions infrastructure, deploys four containerized agents (three models + one intentionally broken), generates traffic, wires up continuous and batch evaluation, runs red-team attacks, and configures alerts, all in a single orchestrated pipeline.
 
 ![AI Observability Starter Kit](docs/AI-Obs-StarterKit-v3.png)
