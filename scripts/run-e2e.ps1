@@ -121,12 +121,14 @@ $azVer = (az version 2>&1 | ConvertFrom-Json).'azure-cli'
 if (-not $azVer) { throw "az CLI not found. Install via: winget install Microsoft.AzureCLI" }
 Write-Host "  [OK] az CLI $azVer" -ForegroundColor Green
 
-# Docker (required for azd deploy to push container images to ACR)
-$dockerVer = docker version --format '{{.Client.Version}}' 2>&1
-if ($LASTEXITCODE -ne 0) {
-    throw "Docker is not running. azd deploy needs Docker to build and push agent containers to ACR. Start Docker Desktop and try again."
+# Docker CLI (agent/azure.yaml sets docker.remoteBuild: true for all services, so azd
+# builds images remotely via ACR Tasks and a running local Docker daemon is not required;
+# only the docker CLI binary needs to be present).
+$dockerCmd = Get-Command docker -ErrorAction SilentlyContinue
+if (-not $dockerCmd) {
+    throw "Docker CLI not found. Install Docker Desktop (the daemon does not need to be running since remoteBuild is enabled)."
 }
-Write-Host "  [OK] Docker $dockerVer" -ForegroundColor Green
+Write-Host "  [OK] Docker CLI present (remote build via ACR, local daemon not required)" -ForegroundColor Green
 
 # az login check
 $azAccount = az account show --query '{name:name, id:id}' -o json 2>&1 | ConvertFrom-Json
