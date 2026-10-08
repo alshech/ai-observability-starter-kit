@@ -60,17 +60,6 @@ services:
                 resources:
                     cpu: "0.25"
                     memory: 0.5Gi
-    agent-framework-agent-notools:
-        project: src/agent-framework-agent-notools
-        host: azure.ai.agent
-        language: docker
-        docker:
-            remoteBuild: true
-        config:
-            container:
-                resources:
-                    cpu: "0.25"
-                    memory: 0.5Gi
     agent-framework-agent-hardened:
         project: src/agent-framework-agent-hardened
         host: azure.ai.agent
