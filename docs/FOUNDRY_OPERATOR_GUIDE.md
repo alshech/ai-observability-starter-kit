@@ -22,7 +22,7 @@ Always check **Telemetry and evaluation health** before reading any other panel.
 
 | Signal | Healthy | If not |
 |---|---|---|
-| Ingestion freshness | under 15 min, never over 60 | Check the agent is running, the connection string is set, and the Application Insights resource isn't over its daily cap. |
+| Ingestion freshness | normally under 5 min while traffic flows. The workbook flags stale at 60 min | Check the agent is running, the connection string is set, and the Application Insights resource isn't over its daily cap. |
 | Trace completeness | close to 100% | Model and tool spans are missing. Confirm `ENABLE_INSTRUMENTATION=true` and the agent framework version. Tokens, cost and hidden-failure panels are unreliable until fixed. |
 
 ## 3. Routines
@@ -78,18 +78,23 @@ Always start from the symptom, then narrow from agent to operation to trace.
 
 ## 5. Suggested thresholds
 
+These match the "KPI thresholds and ownership" table inside the workbook, so operators see one set of numbers. They are discussion starting points. Agree real values with each team's SLOs.
+
 | KPI | Warn | Page |
 |---|---|---|
-| Error rate (agent) | 2% | 5% |
-| p95 end-to-end latency | 10 s | 15 s (matches the Degraded rule) |
-| Tool error rate | 2% | 5% |
-| 429 rate | 1% | 5% |
-| Hidden failure rate | 1% | 3% |
-| Budget used | 80% | 100% |
-| Ingestion freshness | 15 min | 60 min |
-| Red-team attack success rate | 10% | 20% (release gate) |
+| Invocation error rate | above 1% for 15 min | above 5% for 10 min with user impact |
+| End-to-end latency (p95) | above 10 s for 15 min | above 30 s for 10 min, if the SLO is breached |
+| Model-call latency (TTFB proxy, p95) | above 2 s for 15 min | investigate the backend or model |
+| Model throttling (429s) | above 1% for 15 min | above 5% for 10 min, if retries fail |
+| Tool failure rate | above 1% for 15 min | above 5%, if a critical workflow is blocked |
+| Hidden failure rate | above 1% for 15 min | track as a separate recovered-failure group |
+| Budget used | 80% | 100%, or a projected overrun |
+| Ingestion freshness | lag above 5 min for 15 min | no traces for 10 min while traffic is expected |
+| Red-team attack success rate | any new high-severity finding | release gate: no unresolved critical findings. The script's default gate is `--max-asr 0.20`. |
 
-Page only on user impact (errors, latency, down). Send the rest to a ticket queue to avoid alert fatigue.
+The workbook's **health status** colors use fixed rules: Degraded at 5% errors or p95 above 15 s, Down at 20% errors. They are display rules, not alert thresholds.
+
+Rate and percentile alerts need at least 100 eligible events per window. Below that, alert on raw failed counts. Page only on user impact (errors, latency, down) and send the rest to a ticket queue to avoid alert fatigue.
 
 ## 6. Best practices
 
@@ -106,11 +111,11 @@ Page only on user impact (errors, latency, down). Send the rest to a ticket queu
 
 ## 7. Known limitations to tell operators about
 
-- Cost covers only the models in the price table.
+- Cost covers only the models in the price table. Verify the prices for your region and deployment type.
 - Latency is end-to-end per model call, not time to first token.
 - The "Quality and safety" section isn't live.
-- The hidden-failures table can overcount runs with several failed children. Use the rate tile for the true percentage.
+- The hidden-failures table counts distinct runs, but any failed dependency counts, not only model and tool calls.
 - Sessions are traces. A conversation that spans several traces shows as several sessions.
-- The red-team portal's **Create** picker lists prompt agents only. Run hosted agents with `scripts/12-red-team-v2.py --hosted`. The results appear in the portal afterwards.
+- When we tested, the red-team portal's **Create** picker listed prompt agents only. Run hosted agents with `scripts/12-red-team-v2.py --hosted`. The results appear in the portal afterwards. Check the portal again, as this may change.
 
 See [Known limitations and gotchas](FOUNDRY_OPERATOR_WORKBOOK.md#known-limitations-and-gotchas) for the full list.

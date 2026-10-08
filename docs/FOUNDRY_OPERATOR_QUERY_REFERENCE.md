@@ -4,6 +4,8 @@ Every query in the [Foundry Operator Dashboard](FOUNDRY_OPERATOR_WORKBOOK.md), w
 
 There are 29 queries: 26 KQL panels against Application Insights, 2 Azure Resource Graph panels, and 1 Resource Graph parameter query. The workbook applies the time range from the `TimeRange` parameter to the KQL panels. The few panels with a fixed window (budget, self-check, anomaly check) say so.
 
+**Validation:** all 26 KQL queries were executed against a live Application Insights resource (Logs API, 30-day range), and the 3 Resource Graph queries were executed with `az graph query`. All ran without errors. The KQL shown here is checked line by line against the workbook JSON.
+
 ## Contents
 
 1. [Building blocks used by many queries](#1-building-blocks)
@@ -40,7 +42,7 @@ There are 29 queries: 26 KQL panels against Application Insights, 2 Azure Resour
 | `requests \| where name has "invoke_agent"` | Keep only agent runs. `has` matches the whole term, so it doesn't match unrelated request names. |
 | `dependencies \| where name startswith "chat "` | Keep only model calls. The trailing space matters. |
 | `dependencies \| where name startswith "execute_tool"` | Keep only tool calls. |
-| `tostring(split(name, ' ')[1])` | The model name: the second word of `chat gpt-5-mini`. |
+| `replace_regex(tostring(split(name, ' ')[1]), @'-\d{4}-\d{2}-\d{2}$', '')` | The model name: the second word of `chat gpt-5-mini`, with any trailing date version removed. Spans from some SDK versions report `gpt-5-mini-2025-08-07` and others `gpt-5-mini`. Without the cleanup, the same model splits into two rows and misses the price table. |
 | `todouble(customDimensions["gen_ai.usage.input_tokens"])` | Token counts are stored as text in `customDimensions`, so they're cast to numbers. A missing value becomes null and is ignored by `sum`. |
 | `extend agent = tostring(customDimensions["gen_ai.agent.name"])` then `iff(isempty(agent), "unknown-agent", agent)` | The agent name, with a label for runs that have none, so they don't vanish from group-by results. |
 | `tostring(split(_ResourceId, "/")[8])` | The Application Insights resource name, shown as `foundryProject`. It lets rows from several selected projects be told apart. `_ResourceId` is only available because the workbook queries one or more resources. |
@@ -56,12 +58,12 @@ Three queries embed this table. Update all three together.
 let pricing = datatable(model:string, in_per_1k:real, out_per_1k:real)
 [
   "gpt-4o-mini", 0.00015, 0.0006,
-  "gpt-4.1-mini", 0.002, 0.008,
+  "gpt-4.1-mini", 0.0004, 0.0016,
   "gpt-5-mini", 0.00025, 0.002
 ];
 ```
 
-Prices are USD per 1,000 tokens and are illustrative. A model that isn't listed gets null prices, so its cost drops out of the sums without any error.
+Prices are USD per 1,000 tokens and are illustrative. A model that isn't listed gets null prices. The cost table flags it with `price_listed = NO - add to price table`, but the time chart and the budget panel leave it out.
 
 ---
 
@@ -114,7 +116,7 @@ union
 ```kusto
 dependencies
 | where name startswith "chat "
-| extend model = tostring(split(name, ' ')[1])
+| extend model = replace_regex(tostring(split(name, ' ')[1]), @'-\d{4}-\d{2}-\d{2}$', '')
 | extend input_tokens = todouble(customDimensions["gen_ai.usage.input_tokens"])
 | extend output_tokens = todouble(customDimensions["gen_ai.usage.output_tokens"])
 | summarize total_tokens = sum(input_tokens) + sum(output_tokens) by bin(timestamp, 5m), model
@@ -130,7 +132,7 @@ dependencies
 ```kusto
 dependencies
 | where name startswith "chat "
-| extend model = tostring(split(name, ' ')[1])
+| extend model = replace_regex(tostring(split(name, ' ')[1]), @'-\d{4}-\d{2}-\d{2}$', '')
 | extend input_tokens = todouble(customDimensions["gen_ai.usage.input_tokens"])
 | extend output_tokens = todouble(customDimensions["gen_ai.usage.output_tokens"])
 | extend foundryProject = tostring(split(_ResourceId, "/")[8])
@@ -166,7 +168,7 @@ requests
 ```kusto
 dependencies
 | where name startswith "chat "
-| extend model = tostring(split(name, ' ')[1])
+| extend model = replace_regex(tostring(split(name, ' ')[1]), @'-\d{4}-\d{2}-\d{2}$', '')
 | summarize p50_ms = round(percentile(duration, 50), 1), p95_ms = round(percentile(duration, 95), 1) by model
 | order by p95_ms desc
 ```
@@ -211,7 +213,7 @@ requests
 - **Purpose:** find the worst agent first.
 - **How it works:** total and failed runs per project and agent, then the failure percentage, worst first.
 - **Read it as:** judge rate together with `total`. 1 failure in 2 runs is 50% but isn't an incident.
-- **Note:** `agent-framework-agent-broken-model` is an intentional negative test and should sit near 100%.
+- **Note:** `agent-framework-agent-broken-model` is an intentional negative test. In the reference environment its runs report success even though the model call fails, so it shows about 0% here and appears in the [hidden failures](#9-hidden-failures) panel instead.
 
 ### `errors-top-codes-table`: failed runs by result code
 
@@ -325,7 +327,9 @@ requests
     "🟢 Healthy"
   )
 | project foundryProject, agent, Status, error_rate_pct, p95_ms, minutes_since_last_seen, last_seen
-| order by Status asc
+| extend severity_rank = case(Status startswith "🔴", 0, Status startswith "🟡", 1, Status startswith "⚪", 2, 3)
+| order by severity_rank asc, error_rate_pct desc
+| project-away severity_rank
 ```
 
 - **Purpose:** one status per agent.
@@ -338,7 +342,8 @@ requests
 | 🟡 Degraded | error rate at least 5%, or p95 above 15,000 ms |
 | 🟢 Healthy | none of the above |
 
-- **Pitfalls:** the rules use the whole selected time range. With a 7-day range, a problem that ended yesterday still counts. `order by Status` is alphabetical on the emoji text, not by severity. A quiet agent with a low-traffic overnight period can read "No Recent Activity" while being fine.
+`order by` ranks Down first, then Degraded, then No Recent Activity, then Healthy, with the highest error rate first inside each group.
+- **Pitfalls:** the rules use the whole selected time range. With a 7-day range, a problem that ended yesterday still counts. An agent with little traffic can read "No Recent Activity" while being fine.
 - **Tune:** change `60`, `20`, `5` and `15000` to your SLOs.
 
 ---
@@ -353,7 +358,7 @@ All three cost queries use the [price table](#the-price-table-cost-queries). The
 let pricing = datatable(model:string, in_per_1k:real, out_per_1k:real) [ ... ];   // see price table
 dependencies
 | where name startswith "chat "
-| extend model = tostring(split(name, ' ')[1])
+| extend model = replace_regex(tostring(split(name, ' ')[1]), @'-\d{4}-\d{2}-\d{2}$', '')
 | extend input_tokens = todouble(customDimensions["gen_ai.usage.input_tokens"])
 | extend output_tokens = todouble(customDimensions["gen_ai.usage.output_tokens"])
 | join kind=leftouter pricing on model
@@ -363,7 +368,7 @@ dependencies
 ```
 
 - **How it works:** the left outer join attaches prices to each call by model name. Cost is `tokens / 1000 * price` for input plus output, then summed per hour and model.
-- **Pitfalls:** an unlisted model has null prices, and its cost is silently dropped. Add every model you deploy.
+- **Pitfalls:** an unlisted model has null prices and is left out of the chart. Check `cost-table` for `price_listed = NO` and add every model you deploy.
 
 ### `cost-table`: spend totals by model
 
@@ -371,13 +376,13 @@ dependencies
 let pricing = ... ;   // same price table
 dependencies
 | where name startswith "chat "
-| extend model = tostring(split(name, ' ')[1])
+| extend model = replace_regex(tostring(split(name, ' ')[1]), @'-\d{4}-\d{2}-\d{2}$', '')
 | extend input_tokens = todouble(customDimensions["gen_ai.usage.input_tokens"])
 | extend output_tokens = todouble(customDimensions["gen_ai.usage.output_tokens"])
 | join kind=leftouter pricing on model
 | extend est_cost_usd = (input_tokens / 1000.0 * in_per_1k) + (output_tokens / 1000.0 * out_per_1k)
 | extend foundryProject = tostring(split(_ResourceId, "/")[8])
-| summarize calls = count(), input_tokens = sum(input_tokens), output_tokens = sum(output_tokens), est_cost_usd = round(sum(est_cost_usd), 4) by foundryProject, model
+| summarize calls = count(), input_tokens = sum(input_tokens), output_tokens = sum(output_tokens), est_cost_usd = round(sum(est_cost_usd), 4), price_listed = iff(max(toint(isnotnull(in_per_1k))) == 1, "yes", "NO - add to price table") by foundryProject, model
 | order by est_cost_usd desc
 ```
 
@@ -390,7 +395,7 @@ let MONTHLY_BUDGET_USD = 50.0; // set your approved monthly budget here
 let pricing = ... ;   // same price table
 let mtd_cost = toscalar(
   dependencies | where name startswith "chat " and timestamp > startofmonth(now())
-  | extend model = tostring(split(name, ' ')[1])
+  | extend model = replace_regex(tostring(split(name, ' ')[1]), @'-\d{4}-\d{2}-\d{2}$', '')
   | extend input_tokens = todouble(customDimensions["gen_ai.usage.input_tokens"])
   | extend output_tokens = todouble(customDimensions["gen_ai.usage.output_tokens"])
   | join kind=leftouter pricing on model
@@ -428,20 +433,20 @@ A run can finish "successfully" even though a model or tool call inside it faile
 ```kusto
 let failed_children = dependencies
 | where success == false
-| project operation_Id, dep_name = name, dep_resultCode = resultCode;
+| project operation_Id, dep_name = replace_regex(name, @'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', '<id>'), dep_resultCode = resultCode;
 requests
 | where name has "invoke_agent" and success == true
 | extend agent = tostring(customDimensions["gen_ai.agent.name"])
 | extend agent = iff(isempty(agent), "unknown-agent", agent)
 | extend foundryProject = tostring(split(_ResourceId, "/")[8])
 | join kind=inner failed_children on operation_Id
-| summarize hidden_failures = count(), failed_dependencies = make_set(dep_name, 10) by foundryProject, agent
+| summarize hidden_failures = dcount(operation_Id), failed_dependencies = make_set(dep_name, 10) by foundryProject, agent
 | order by hidden_failures desc
 ```
 
-- **How it works:** `failed_children` lists every failed dependency with its trace ID. Successful runs are inner-joined to it on `operation_Id`. The result counts matches per agent and lists up to 10 distinct failing dependency names.
+- **How it works:** `failed_children` lists every failed dependency with its trace ID. Successful runs are inner-joined to it on `operation_Id`. The result counts **distinct** traces per agent and lists up to 10 distinct failing dependency names.
 - **Read it as:** `failed_dependencies` tells you where to look: a tool name, a model, or an external target.
-- **Pitfalls:** the join produces one row per failed child, so a run with three failed children counts three times. The count can overstate the number of runs. Use the rate query below for a true percentage. Any failed dependency counts, not only model and tool calls.
+- **Pitfalls:** `dcount(operation_Id)` counts each affected run once, however many children failed. Any failed dependency counts, not only model and tool calls. The failed child may belong to a different agent in the same trace.
 
 ### `hidden-failures-rate`: overall rate
 
@@ -476,12 +481,12 @@ Resources
 let err = toscalar(requests | where timestamp > ago(15m) | where name has "invoke_agent" | where success == false | summarize n = count());
 let lat = toscalar(requests | where timestamp > ago(15m) | where name has "invoke_agent" | summarize p95 = percentile(duration, 95));
 print AlertRule = "invoke_agent errors > 0 (last 15m)", CurrentValue = tostring(err), Threshold = "> 0", WouldFireNow = iff(err > 0, "🔴 Yes", "🟢 No")
-| union (print AlertRule = "invoke_agent p95 latency > 30s (last 15m)", CurrentValue = strcat(tostring(round(lat, 0)), "ms"), Threshold = "> 30000ms", WouldFireNow = iff(lat > 30000, "🔴 Yes", "🟢 No"))
+| union (print AlertRule = "invoke_agent p95 latency > 30s (last 15m)", CurrentValue = iff(isnull(lat), "no runs", strcat(tostring(round(lat, 0)), "ms")), Threshold = "> 30000ms", WouldFireNow = iff(lat > 30000, "🔴 Yes", "🟢 No"))
 ```
 
 - **Purpose:** shows whether the two deployed alert conditions would fire **right now**, without opening the alert blade.
 - **How it works:** two scalars over the last 15 minutes (failed runs, and p95 duration) are compared with the same thresholds as the alert rules, producing two rows.
-- **Pitfalls:** it uses a fixed `ago(15m)` and ignores the dashboard range. With no runs in the window the latency row shows an empty value and "No". Keep the thresholds in step with the deployed alert rules.
+- **Pitfalls:** it uses a fixed `ago(15m)` and ignores the dashboard range. With no runs in the window the latency row shows "no runs" and the answer is "No". Keep the thresholds in step with the deployed alert rules.
 
 ### `ops-dependency-health`
 
@@ -564,12 +569,12 @@ requests
 | where name has "invoke_agent"
 | extend has_child = iff(operation_Id in ((dependencies | project operation_Id)), true, false)
 | summarize total = count(), with_children = countif(has_child == true)
-| extend trace_completeness_pct = round(100.0 * with_children / total, 2)
+| extend trace_completeness_pct = iff(total == 0, real(null), round(100.0 * with_children / total, 2))
 ```
 
 - **Purpose:** checks that runs have child spans (model or tool calls). Without them, tokens, cost, tool and hidden-failure panels are incomplete.
 - **How it works:** for each run, test whether any dependency shares its `operation_Id`, then compute the percent that do.
-- **Pitfalls:** an agent that legitimately makes no model call would lower the value, but that is rare. With no runs, the result is empty. The `in` subquery is limited in size, so on very large data sets use a shorter time range.
+- **Pitfalls:** an agent that legitimately makes no model call would lower the value, but that is rare. With no runs, the result is null. The `in` subquery is limited in size (about one million values), so on very large data sets use a shorter time range.
 
 ---
 
@@ -579,4 +584,4 @@ requests
 - **Log Analytics workspace:** if the resource is workspace-based, the tables are `AppRequests` and `AppDependencies`, with columns such as `Name`, `Success`, `DurationMs`, `OperationId` and `Properties`. The queries need translating.
 - **Resource Graph panels** run in **Azure Resource Graph Explorer**, not in Logs.
 - **Alerts:** to alert from a panel, copy the query into a scheduled-query rule and add a threshold. Use the `ops-alert-self-check` logic as the starting point.
-- **Scripts:** `scripts/13-telemetry-kql.py` runs a similar set of queries from the command line.
+- **Scripts:** `scripts/13-telemetry-kql.py` runs a smaller set of test-case queries (volume, latency percentiles and similar) through the Logs Query API and writes `artifacts/telemetry.json`. It doesn't run these panels.

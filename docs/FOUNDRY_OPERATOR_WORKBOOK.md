@@ -78,7 +78,7 @@ Six tiles from one `union` query: **Agent Runs**, **Success Rate (%)**, **Error 
 | Top error codes by agent | Failed runs grouped by `resultCode` |
 | Invocation errors by class | Failed runs classed as 4xx (client or config) or 5xx (server or backend) from `resultCode` |
 
-`agent-framework-agent-broken-model` is an intentional negative test and is expected to show about 100% errors.
+`agent-framework-agent-broken-model` is an intentional negative test. In the reference environment its runs report success even though the model call fails, so it shows about 0% here and appears under hidden failures instead. This is a good example of why that panel exists.
 
 ### 4. Agent runs
 **Sessions: turn count per conversation (top 50)** counts `invoke_agent` requests per `operation_Id` and agent, with the last-seen time. A high turn count flags runaway loops or very long conversations. Note that `operation_Id` is a trace, so this equals "turns per trace", which matches a conversation only when one trace spans the whole conversation.
@@ -104,7 +104,9 @@ Rising tool latency or tool errors often appears before agent-level errors.
 | Degraded | error rate at least 5%, or p95 above 15,000 ms |
 | Healthy | everything else |
 
-The table also shows the error rate, p95, minutes since last seen and last-seen time.
+The table also shows the error rate, p95, minutes since last seen and last-seen time. It is sorted by severity (Down, Degraded, No Recent Activity, Healthy), then by error rate, so problems appear first.
+
+A hosted agent that reports `success=true` while its model calls fail shows 0% errors here. Check the hidden-failures panels for it.
 
 ### 8. Cost and capacity
 | Panel | What it shows |
@@ -119,10 +121,10 @@ Cost is `tokens / 1000 * price_per_1k`, using an inline `datatable` of list pric
 | Model | Input per 1K | Output per 1K |
 |---|---|---|
 | gpt-4o-mini | 0.00015 | 0.0006 |
-| gpt-4.1-mini | 0.002 | 0.008 |
+| gpt-4.1-mini | 0.0004 | 0.0016 |
 | gpt-5-mini | 0.00025 | 0.002 |
 
-These are estimates. Reconcile with Azure Cost Management. A model that isn't in the table gets a null price, so its cost is dropped from the sums silently.
+These are estimates. Reconcile with Azure Cost Management. Spans report versioned model names (for example `gpt-4.1-mini-2025-04-14`). The queries strip the trailing date so they match the price table. A model that isn't in the table gets a null price and is left out of the cost chart and budget. The cost table flags it with `price_listed = NO - add to price table`.
 
 ### Hidden failures
 A successful `invoke_agent` run can still contain a failed tool or model call that the agent recovered from or ignored. Alert rules that only check `requests.success` can't see this.
@@ -130,7 +132,7 @@ A successful `invoke_agent` run can still contain a failed tool or model call th
 - **Overall hidden failure rate:** distinct traces with a failed child, divided by all successful runs.
 
 ### 9. Quality and safety (static)
-A text snapshot, not a live query. Evaluation scores and red-team results come from the Foundry Evaluations service, not from the telemetry in Application Insights. The note records the continuous eval rule (`demo-continuous-eval`: `intent_resolution`, `tool_call_accuracy`, `violence`) and the last red-team run (54 attempts: 30 passed, 24 failed). It is out of date as soon as a new scan runs, so update or replace it. The red-team v2 script writes `artifacts/redteam.json`, which has the current numbers.
+A text note, not a live query. Evaluation scores and red-team results come from the Foundry Evaluations service, not from the telemetry in Application Insights. The note says where to find current results (Foundry portal Evaluations and Red team panes, and `artifacts/redteam.json` written by `scripts/12-red-team-v2.py`) and suggests a cadence.
 
 ### 10. Operational depth
 | Panel | Source | What it shows |
@@ -165,13 +167,12 @@ Check these before trusting the other charts.
 2. **Resource Graph scope:** `ops-alert-rules` and `ops-model-inventory` list every alert rule and model deployment in the selected subscriptions. Add `| where resourceGroup =~ '<rg>'` to narrow them.
 3. **Prices:** edit the `datatable` in the three cost queries, and `MONTHLY_BUDGET_USD` (50.0) in the burn-down query.
 4. **Alert thresholds in the self-check:** the 15-minute window, "errors greater than 0" and "p95 greater than 30 s" mirror the two deployed alert rules. Keep them in sync.
-5. **Static red-team text:** refresh section 9 after a new scan.
+5. **Quality and safety note:** it points at the portal and the v2 script. Adjust the cadence and wording to your process.
 
 ## Known limitations and gotchas
 
-- **Hidden-failures count can be inflated.** `hidden-failures-table` inner-joins runs to failed child dependencies, so a run with several failed children is counted once per child. `hidden-failures-rate` uses `dcount(operation_Id)` and doesn't have this problem, so the two numbers can differ.
-- **Cost covers only three models.** See the pricing note above.
+- **Hidden-failures table counts distinct runs.** `hidden_failures` is `dcount(operation_Id)`, so a run with several failed children counts once. Any failed dependency counts, not only model and tool calls.
+- **Cost covers only three models.** See the pricing note above. Verify the prices against the current Azure price sheet for your region and deployment type before using them for budgets.
 - **TTFB is a proxy.** See section 2.
-- **Percent signs.** A few text blocks show `%%` (for example in the thresholds table). That comes from the original workbook and is cosmetic.
 - **Quality and safety isn't live.** Use the Foundry portal Evaluations and Red team views for current results.
-- **Health status sorting.** The table orders by the status text, which includes an emoji prefix, so the ordering is alphabetical and not by severity.
+- **Validation status.** All 26 KQL queries and the 3 Resource Graph queries were executed against a live environment and ran without errors. Re-run them against your own environment after import, because results depend on your data. See the query reference.
