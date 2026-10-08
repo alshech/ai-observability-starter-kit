@@ -3,7 +3,8 @@
 An Azure Monitor **workbook** that gives operators one page for the health, cost and risk of Foundry agents. It reads the OpenTelemetry data the agents send to Application Insights.
 
 - **Workbook definition:** [`artifacts/workbooks/foundry-operator-dashboard.workbook.json`](../artifacts/workbooks/foundry-operator-dashboard.workbook.json)
-- **Exported from:** workbook `3b542070-6811-4ed8-8028-e32640486e56` in resource group `rg-ai-obs-kit` (read-only export).
+- **Operator guide:** [`FOUNDRY_OPERATOR_GUIDE.md`](FOUNDRY_OPERATOR_GUIDE.md) explains how to use it day to day.
+- **Origin:** exported from the starter-kit reference environment, with environment-specific IDs removed.
 - **Contents:** 56 items. About 30 are KQL panels, and the rest are headings, notes and parameters.
 
 > The definition is stored as a workbook "gallery template" JSON (the `serializedData` value), so it can be imported in the portal or deployed from an ARM/Bicep template.
@@ -45,7 +46,7 @@ Table panels add a `foundryProject` column, taken from `split(_ResourceId, "/")[
 |---|---|---|
 | `TimeRange` | time range picker, default 24 h | Applies to every query panel. |
 | `Subscriptions` | subscription picker | Scopes the two Resource Graph panels (alert rules, model inventory). |
-| `AppInsightsResources` | resource picker (Resource Graph query on `microsoft.insights/components`) | Selects which Foundry project(s) every KQL panel reads. The default is the `appi-qv5a2wfxrzxe2` resource in `rg-ai-obs-kit`. |
+| `AppInsightsResources` | resource picker (Resource Graph query on `microsoft.insights/components`) | Selects which Foundry project(s) every KQL panel reads. No default: choose one or more after import. |
 
 ## Sections and queries
 
@@ -159,8 +160,8 @@ Check these before trusting the other charts.
 
 ## Things to change per environment
 
-1. **Default project:** the `AppInsightsResources` parameter pre-selects the Application Insights resource in `rg-ai-obs-kit`, by full resource ID including the subscription ID. Pick your own resource in the dropdown, or edit the `selected = id =~ '...'` clause.
-2. **Resource group filter:** `ops-alert-rules` and `ops-model-inventory` hard-code `resourceGroup =~ 'rg-ai-obs-kit'`. Change it to your resource group.
+1. **Project selection:** the `AppInsightsResources` parameter has no default. Pick your Application Insights resource(s) in the dropdown after import. To pre-select one, edit `selected = false` in the parameter's query to `selected = id =~ '<resource id>'`.
+2. **Resource Graph scope:** `ops-alert-rules` and `ops-model-inventory` list every alert rule and model deployment in the selected subscriptions. Add `| where resourceGroup =~ '<rg>'` to narrow them.
 3. **Prices:** edit the `datatable` in the three cost queries, and `MONTHLY_BUDGET_USD` (50.0) in the burn-down query.
 4. **Alert thresholds in the self-check:** the 15-minute window, "errors greater than 0" and "p95 greater than 30 s" mirror the two deployed alert rules. Keep them in sync.
 5. **Static red-team text:** refresh section 9 after a new scan.

@@ -19,6 +19,14 @@ An HTTP 200 tells you nothing about what happened inside an AI agent call. Model
 | **Alerting** | Scheduled query rules for error spikes (Severity 2) and p95 latency breaches (Severity 3) |
 | **Dashboards** | App Insights Agents pane, Grafana dashboards, and exportable telemetry JSON |
 
+## Foundry Operator Dashboard
+
+For teams operating Foundry agents, start with the Azure Monitor workbook:
+
+- [`artifacts/workbooks/foundry-operator-dashboard.workbook.json`](artifacts/workbooks/foundry-operator-dashboard.workbook.json): importable workbook (health, latency, errors, tokens, cost, tools, hidden failures, telemetry health).
+- [`docs/FOUNDRY_OPERATOR_WORKBOOK.md`](docs/FOUNDRY_OPERATOR_WORKBOOK.md): every panel and KQL query explained, plus import steps.
+- [`docs/FOUNDRY_OPERATOR_GUIDE.md`](docs/FOUNDRY_OPERATOR_GUIDE.md): how operators use it: routines, triage playbooks, thresholds, best practices.
+
 ## Quick Start
 
 **Prerequisites:** PowerShell 7, azd 1.25.1+, az CLI 2.86.0+, Docker 29.x, Python 3.12+

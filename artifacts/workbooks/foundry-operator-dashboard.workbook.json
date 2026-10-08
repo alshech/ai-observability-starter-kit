@@ -106,7 +106,7 @@
             "multiSelect": true,
             "quote": "'",
             "delimiter": ",",
-            "query": "Resources\r\n| where type =~ 'microsoft.insights/components'\r\n| order by name asc\r\n| project value = id, label = name, selected = id =~ '/subscriptions/79c353dc-0e60-45ed-9b2a-b0dea933c798/resourceGroups/rg-ai-obs-kit/providers/microsoft.insights/components/appi-qv5a2wfxrzxe2', group = resourceGroup",
+            "query": "Resources\r\n| where type =~ 'microsoft.insights/components'\r\n| order by name asc\r\n| project value = id, label = name, selected = false, group = resourceGroup",
             "crossComponentResources": [
               "{Subscriptions}"
             ],
@@ -694,7 +694,7 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "Resources\n| where type =~ 'microsoft.insights/scheduledqueryrules'\n| where resourceGroup =~ 'rg-ai-obs-kit'\n| project name, severity = properties.severity, enabled = properties.enabled, description = properties.description",
+        "query": "Resources\n| where type =~ 'microsoft.insights/scheduledqueryrules'\n| project name, severity = properties.severity, enabled = properties.enabled, description = properties.description",
         "size": 0,
         "queryType": 1,
         "resourceType": "microsoft.resourcegraph/resources",
@@ -782,7 +782,7 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "Resources\n| where type =~ 'microsoft.cognitiveservices/accounts/deployments'\n| where resourceGroup =~ 'rg-ai-obs-kit'\n| project name, model = properties.model.name, version = properties.model.version, sku = sku.name, capacity = sku.capacity, provisioningState = properties.provisioningState",
+        "query": "Resources\n| where type =~ 'microsoft.cognitiveservices/accounts/deployments'\n| project name, model = properties.model.name, version = properties.model.version, sku = sku.name, capacity = sku.capacity, provisioningState = properties.provisioningState",
         "size": 0,
         "queryType": 1,
         "resourceType": "microsoft.resourcegraph/resources",
