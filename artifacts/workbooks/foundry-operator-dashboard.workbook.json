@@ -4,7 +4,7 @@
     {
       "type": 1,
       "content": {
-        "json": "# Foundry Operator Dashboard\n\n**Five questions this dashboard must answer without reconstructing the system manually (KP CPE Workshop Operator Build Guide):**\n1. Is the agent reachable and processing requests?\n2. Which inner operation failed: agent runtime, model call, tool call, or dependency?\n3. Is the agent behavior useful, safe, compliant, and aligned with its task?\n4. What is changing over time in latency, errors, tokens, cost, and evaluation scores?\n5. Who must act, through which channel, and using which runbook?\n\n| # | KPI area | Section |\n|---|---|---|\n| 1 | Token utilization | Tokens |\n| 2 | Latency / TTFB | Latency |\n| 3 | Error rates (incl. 4xx/5xx) | Errors |\n| 4 | Agent runs | Runs & Sessions |\n| 5 | Tool calls | Tools |\n| 6 | Success rates | Success |\n| 7 | Health status | Health |\n| 8 | Cost & capacity | Cost |\n| 9 | Hidden failures | Hidden Failures |\n| 10 | Quality & safety (static snapshot) | Quality & Safety |\n| 11 | Operational depth (alerts, dependencies, models) | Operations |\n| 12 | Usage patterns | Usage |\n| 13 | Telemetry & evaluation health | Telemetry Health |\n| 14 | KPI thresholds & ownership | Thresholds |\n| 15 | Known challenges & mitigations | Challenges |\n| 16 | Open governance decisions | Decisions |\n"
+        "json": "# Foundry Operator Dashboard\n\n**Five questions this dashboard must answer without reconstructing the system manually (KP CPE Workshop Operator Build Guide):**\n1. Is the agent reachable and processing requests?\n2. Which inner operation failed: agent runtime, model call, tool call, or dependency?\n3. Is the agent behavior useful, safe, compliant, and aligned with its task?\n4. What is changing over time in latency, errors, tokens, cost, and evaluation scores?\n5. Who must act, through which channel, and using which runbook?\n\n| # | KPI area | Section |\n|---|---|---|\n| 1 | Token utilization | Tokens |\n| 2 | Latency / TTFB | Latency |\n| 3 | Error rates (incl. 4xx/5xx) | Errors |\n| 4 | Agent runs | Runs & Sessions |\n| 5 | Tool calls | Tools |\n| 6 | Success rates | Success |\n| 7 | Health status | Health |\n| 8 | Cost & capacity | Cost |\n| 9 | Hidden failures | Hidden Failures |\n| 10 | Quality & safety (static note) | Quality & Safety |\n| 11 | Operational depth (alerts, dependencies, models) | Operations |\n| 12 | Usage patterns | Usage |\n| 13 | Telemetry & evaluation health | Telemetry Health |\n| 14 | KPI thresholds & ownership | Thresholds |\n| 15 | Known challenges & mitigations | Challenges |\n| 16 | Open governance decisions | Decisions |\n"
       },
       "name": "overview"
     },
@@ -130,12 +130,9 @@
               "{Subscriptions}"
             ],
             "typeSettings": {
-              "additionalResourceOptions": [
-                "value::1"
-              ],
+              "additionalResourceOptions": [],
               "showDefault": false
             },
-            "defaultValue": "value::1",
             "queryType": 1,
             "resourceType": "microsoft.resourcegraph/resources"
           }
@@ -165,7 +162,7 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "let reqs = requests | where name has \"invoke_agent\";\nlet dchat = dependencies | where name startswith \"chat \";\nlet dtool = dependencies | where name startswith \"execute_tool\";\nunion\n(reqs | summarize Value = toreal(count()) | extend Metric = \"Agent Runs\", Fmt = \"short\"),\n(reqs | summarize Value = iff(count() == 0, 0.0, round(100.0 * countif(success == true) / count(), 2)) | extend Metric = \"Success Rate (%)\", Fmt = \"pct\"),\n(reqs | summarize Value = iff(count() == 0, 0.0, round(100.0 * countif(success == false) / count(), 2)) | extend Metric = \"Error Rate (%)\", Fmt = \"pct\"),\n(reqs | summarize Value = round(percentile(duration, 95), 1) | extend Metric = \"P95 Latency (ms)\", Fmt = \"ms\"),\n(dtool | summarize Value = toreal(count()) | extend Metric = \"Tool Calls\", Fmt = \"short\"),\n(dchat | extend intok = todouble(customDimensions[\"gen_ai.usage.input_tokens\"]), outtok = todouble(customDimensions[\"gen_ai.usage.output_tokens\"]) | summarize Value = round(sum(intok) + sum(outtok), 0) | extend Metric = \"Total Tokens\", Fmt = \"short\")\n| project Metric, Value",
+        "query": "let reqs = requests | where name has \"invoke_agent\";\nlet dchat = dependencies | where name startswith \"chat \";\nlet dtool = dependencies | where name startswith \"execute_tool\";\nunion\n(reqs | summarize Value = toreal(count()) | extend Metric = \"Agent Runs\", Fmt = \"short\"),\n(reqs | summarize Value = iff(count() == 0, real(null), round(100.0 * countif(success == true) / count(), 2)) | extend Metric = \"Success Rate (%)\", Fmt = \"pct\"),\n(reqs | summarize Value = iff(count() == 0, real(null), round(100.0 * countif(success == false) / count(), 2)) | extend Metric = \"Error Rate (%)\", Fmt = \"pct\"),\n(reqs | summarize Value = round(percentile(duration, 95), 1) | extend Metric = \"P95 Latency (ms)\", Fmt = \"ms\"),\n(dtool | summarize Value = toreal(count()) | extend Metric = \"Tool Calls\", Fmt = \"short\"),\n(dchat | extend intok = todouble(customDimensions[\"gen_ai.usage.input_tokens\"]), outtok = todouble(customDimensions[\"gen_ai.usage.output_tokens\"]) | summarize Value = round(sum(intok) + sum(outtok), 0) | extend Metric = \"Total Tokens\", Fmt = \"short\")\n| project Metric, Value",
         "size": 3,
         "timeContextFromParameter": "TimeRange",
         "queryType": 0,
@@ -290,7 +287,7 @@
     {
       "type": 1,
       "content": {
-        "json": "---\n## 3️⃣ Error Rates\nFailure percentage overall, over time, and by agent. The `agent-framework-agent-broken-model` agent is an intentional negative test (bad model deployment). Its runs may still be reported as successful, so its failures can show up under **Hidden Failures** instead of here. Keep it in mind when judging overall platform health."
+        "json": "---\n## 3️⃣ Error Rates\nFailure percentage overall, over time, and by agent. An agent whose model call fails can still report its run as successful (for example a bad or missing model deployment, such as an intentional negative-test agent). Its failures then show up under **Hidden Failures** instead of here. Keep that in mind when judging overall platform health."
       },
       "name": "section-errors-header"
     },
@@ -568,7 +565,7 @@
     {
       "type": 1,
       "content": {
-        "json": "⚠️ `agent-framework-agent-broken-model` is an intentional negative-test agent wired to a bad deployment, not a real incident. Because its runs can report success, it may show 🟢 Healthy here while the **Hidden Failures** section shows its failed model calls.",
+        "json": "⚠️ An agent whose model call fails but whose run still reports success (for example a bad or missing model deployment, or an intentional negative-test agent) can show 🟢 Healthy here while the **Hidden Failures** section shows its failed model calls.",
         "style": "warning"
       },
       "name": "health-broken-model-note"

@@ -49,7 +49,7 @@ Table panels add a `foundryProject` column, taken from `split(_ResourceId, "/")[
 | `TimeRange` | time range picker, default 24 h | Applies to every query panel. |
 | `Subscriptions` | subscription picker | Scopes the alert-rules panel and the project and account pickers. |
 | `AppInsightsResources` | resource picker (Resource Graph query on `microsoft.insights/components`) | Selects which Foundry project(s) every KQL panel reads. No default: choose one or more after import. |
-| `FoundryAccount` | single-select resource picker (Resource Graph query on `microsoft.cognitiveservices/accounts`), defaults to the first account | Selects the Foundry account whose model deployments the inventory panel lists. |
+| `FoundryAccount` | single-select resource picker (Resource Graph query on `microsoft.cognitiveservices/accounts`) | Selects the Foundry account whose model deployments the inventory panel lists. No default: choose one account. |
 
 ## Sections and queries
 
@@ -58,7 +58,7 @@ Six tiles from one `union` query: **Agent Runs**, **Success Rate (%)**, **Error 
 - Runs, success and error come from `requests` where `name has "invoke_agent"`.
 - Tool calls count `dependencies` where `name startswith "execute_tool"`.
 - Tokens sum input and output tokens over `chat ` dependencies.
-- Rates return 0 when there are no runs, so the tile stays empty-safe.
+- Rates are blank when there are no runs, so a quiet system doesn't show a misleading 0%. A blank rate with **Agent Runs** at 0 means the agents were idle in the selected range.
 
 ### 1. Token utilization
 | Panel | What it shows | Query logic |
@@ -80,7 +80,7 @@ Six tiles from one `union` query: **Agent Runs**, **Success Rate (%)**, **Error 
 | Top error codes by agent | Failed runs grouped by `resultCode` |
 | Invocation errors by class | Failed runs classed as 4xx (client or config) or 5xx (server or backend) from `resultCode` |
 
-`agent-framework-agent-broken-model` is an intentional negative test. In the reference environment its runs report success even though the model call fails, so it shows about 0% here and appears under hidden failures instead. This is a good example of why that panel exists.
+An agent whose model call fails can still report its run as successful, for example when its model deployment is bad or missing, or when it is an intentional negative-test agent. It then shows about 0% here and appears under hidden failures instead. This is a good example of why that panel exists.
 
 ### 4. Agent runs
 **Sessions: turn count per conversation (top 50)** counts `invoke_agent` requests per `operation_Id` and agent, with the last-seen time. A high turn count flags runaway loops or very long conversations. Note that `operation_Id` is a trace, so this equals "turns per trace", which matches a conversation only when one trace spans the whole conversation.

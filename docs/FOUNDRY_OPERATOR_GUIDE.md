@@ -51,7 +51,7 @@ Always check **Telemetry and evaluation health** before reading any other panel.
 
 ### After every release
 1. Compare the 24 hours before and after: error rate, p95, tokens per run, tool error rate.
-2. Run the red-team v2 gate before promoting. A failing gate blocks the release.
+2. Run a red-team scan before promoting and compare the attack success rate (ASR) with your agreed limit. A scan above the limit, or any unresolved critical finding, blocks the release.
 3. Confirm trace completeness didn't drop.
 
 ## 4. Triage playbooks
@@ -90,7 +90,7 @@ These match the "KPI thresholds and ownership" table inside the workbook, so ope
 | Hidden failure rate | above 1% for 15 min | track as a separate recovered-failure group |
 | Budget used | 80% | 100%, or a projected overrun |
 | Ingestion freshness | lag above 5 min for 15 min | no traces for 10 min while traffic is expected |
-| Red-team attack success rate | any new high-severity finding | release gate: no unresolved critical findings. The script's default gate is `--max-asr 0.20`. |
+| Red-team attack success rate (ASR) | any new high-severity finding | release gate: no unresolved critical findings, and an ASR below your agreed limit (for example 20%) |
 
 The workbook's **health status** colors use fixed rules: Degraded at 5% errors or p95 above 15 s, Down at 20% errors. They are display rules, not alert thresholds.
 
@@ -116,6 +116,6 @@ Rate and percentile alerts need at least 100 eligible events per window. Below t
 - The "Quality and safety" section isn't live.
 - The hidden-failures table counts distinct runs, but any failed dependency counts, not only model and tool calls.
 - Sessions are traces. A conversation that spans several traces shows as several sessions.
-- When we tested, the red-team portal's **Create** picker listed prompt agents only, not hosted agents. Check whether your portal version lists your hosted agents. If it doesn't, red-team a prompt agent that uses the same model and instructions, or use the Foundry red-teaming SDK to target the hosted agent.
+- At the time of writing, the red-team portal's **Create** picker listed prompt agents only, not hosted agents. Check whether your portal version lists your hosted agents. If it doesn't, red-team a prompt agent that uses the same model and instructions, or use the Foundry red-teaming SDK to target the hosted agent.
 
 See [Known limitations and gotchas](FOUNDRY_OPERATOR_WORKBOOK.md#known-limitations-and-gotchas) for the full list.

@@ -92,7 +92,7 @@ Resources
 ```
 
 - **Purpose:** fills the dropdown that chooses which Foundry (or Azure OpenAI) account the model inventory panel lists.
-- **How it works:** Resource Graph lists the accounts of kind `AIServices` and `OpenAI` in the selected subscriptions. `value` is the full resource ID, which the inventory panel uses in its REST path. The parameter is single-select and its default is the first account in the list (`defaultValue` is `value::1`).
+- **How it works:** Resource Graph lists the accounts of kind `AIServices` and `OpenAI` in the selected subscriptions. `value` is the full resource ID, which the inventory panel uses in its REST path. The parameter is single-select and has no default, so the inventory panel asks you to choose an account. A "first value" default would pick an arbitrary account.
 - **Tune:** add `| where resourceGroup =~ '<rg>'` to shorten the list.
 
 ---
@@ -107,8 +107,8 @@ let dchat = dependencies | where name startswith "chat ";
 let dtool = dependencies | where name startswith "execute_tool";
 union
 (reqs | summarize Value = toreal(count()) | extend Metric = "Agent Runs", Fmt = "short"),
-(reqs | summarize Value = iff(count() == 0, 0.0, round(100.0 * countif(success == true) / count(), 2)) | extend Metric = "Success Rate (%)", Fmt = "pct"),
-(reqs | summarize Value = iff(count() == 0, 0.0, round(100.0 * countif(success == false) / count(), 2)) | extend Metric = "Error Rate (%)", Fmt = "pct"),
+(reqs | summarize Value = iff(count() == 0, real(null), round(100.0 * countif(success == true) / count(), 2)) | extend Metric = "Success Rate (%)", Fmt = "pct"),
+(reqs | summarize Value = iff(count() == 0, real(null), round(100.0 * countif(success == false) / count(), 2)) | extend Metric = "Error Rate (%)", Fmt = "pct"),
 (reqs | summarize Value = round(percentile(duration, 95), 1) | extend Metric = "P95 Latency (ms)", Fmt = "ms"),
 (dtool | summarize Value = toreal(count()) | extend Metric = "Tool Calls", Fmt = "short"),
 (dchat | extend intok = todouble(customDimensions["gen_ai.usage.input_tokens"]), outtok = todouble(customDimensions["gen_ai.usage.output_tokens"]) | summarize Value = round(sum(intok) + sum(outtok), 0) | extend Metric = "Total Tokens", Fmt = "short")
@@ -118,7 +118,7 @@ union
 - **Purpose:** one row per tile for a first look at health and volume.
 - **How it works:** the three `let` lines name the three row sets. Each `union` branch reduces one of them to a single number and labels it. `Fmt` tells the tile renderer how to format the value (count, percent, milliseconds). The final `project` keeps the two columns the tiles need.
 - **Read it as:** success plus error rate should be about 100%. A big gap means runs with no `success` value.
-- **Pitfalls:** the `iff(count() == 0, ...)` guard returns 0 when there are no runs. A 0% error rate with 0 runs isn't "healthy", so read it next to **Agent Runs**.
+- **Pitfalls:** the `iff(count() == 0, ...)` guard returns null when there are no runs, so the success and error rate tiles are blank instead of showing a misleading 0%. A blank tile with **Agent Runs** at 0 means the agents were idle in the selected range, not that they failed. Widen the time range to see data.
 
 ---
 
@@ -226,7 +226,7 @@ requests
 - **Purpose:** find the worst agent first.
 - **How it works:** total and failed runs per project and agent, then the failure percentage, worst first.
 - **Read it as:** judge rate together with `total`. 1 failure in 2 runs is 50% but isn't an incident.
-- **Note:** `agent-framework-agent-broken-model` is an intentional negative test. In the reference environment its runs report success even though the model call fails, so it shows about 0% here and appears in the [hidden failures](#9-hidden-failures) panel instead.
+- **Note:** an agent whose model call fails can still report its run as successful, for example when its model deployment is bad or missing, or when it is an intentional negative-test agent. It then shows about 0% here and appears in the [hidden failures](#9-hidden-failures) panel instead.
 
 ### `errors-top-codes-table`: failed runs by result code
 

@@ -1,5 +1,7 @@
 # Foundry Operator Dashboard
 
+**Version 1.0 · 2026-10-08**
+
 An Azure Monitor workbook that gives Foundry operators one page for the health, cost and risk of their agents. It reads the OpenTelemetry data the agents already send to Application Insights. It needs no code changes in the agents.
 
 This package contains the workbook and the documentation around it. Start with the [Quick start](#quick-start), then use the [reading order](#what-to-read-and-when) below.
@@ -51,7 +53,7 @@ See [`docs/FOUNDRY_OPERATOR_WORKBOOK.md`](docs/FOUNDRY_OPERATOR_WORKBOOK.md) for
 1. In the Azure portal, open the **Application Insights** resource, then **Workbooks**, then **New**.
 2. Click **Advanced editor** (`</>`), switch to the **Gallery Template** tab, and paste the contents of [`foundry-operator-dashboard.workbook.json`](artifacts/workbooks/foundry-operator-dashboard.workbook.json).
 3. Click **Apply**, then **Save**. Choose a name, subscription and resource group.
-4. At the top of the workbook, choose your **Subscriptions** and one or more **AppInsightsResources**. The resource picker has no default, so the panels stay empty until you choose. The **FoundryAccount** picker defaults to the first Foundry account. Change it to list the model deployments of another account.
+4. At the top of the workbook, choose your **Subscriptions**, one or more **AppInsightsResources** and one **FoundryAccount**. None of the three pickers has a default, so the dependent panels ask you to choose until you do. The FoundryAccount picker only drives the model inventory panel.
 5. Set the **TimeRange**, then walk through the sections.
 6. Complete the checklist below before operators rely on it.
 
@@ -83,6 +85,7 @@ The full list is in the [per-environment section](docs/FOUNDRY_OPERATOR_WORKBOOK
 - **Three panels ignore the time range.** The self-check (last 15 minutes), the budget burn-down (month to date) and the usage anomaly check (24 hours against 7 days) use fixed windows.
 - **Hidden failures matter.** An agent can report `success=true` while its model calls fail. It then shows 0% errors in the error panels. Check the hidden-failures panels.
 - **Quiet is not healthy.** A system with no traffic looks the same as an outage in the ingestion freshness panel.
+- **Empty panels usually mean a quiet range.** When the agents had no traffic in the selected time range, panels are empty and the rate tiles are blank. Widen the range (for example to 7 days) before assuming a fault.
 - **Time to first token is a proxy.** It is the duration of the whole model-call span, not a true streaming measurement.
 - **Quality and safety isn't live in the workbook.** Use the Foundry portal Evaluations and Red team views for current results.
 
@@ -90,7 +93,7 @@ The complete list is in section 7 of the [operator guide](docs/FOUNDRY_OPERATOR_
 
 ## Validation status
 
-All 26 KQL queries, the Resource Graph queries and the model-inventory REST call were executed read-only against a live Foundry environment and ran without errors. The workbook was also deployed as a separate workbook, and the deployed definition matched the file in this package. Executing without errors doesn't prove the numbers match your data. After you import the workbook, check a few panels against raw telemetry in Application Insights Logs, and use the telemetry health section to confirm data is arriving.
+All 26 KQL queries, the Resource Graph queries and the model-inventory REST call were executed read-only against a live Foundry environment and ran without errors. The workbook was also deployed as a separate workbook and opened in the Azure portal, where its panels rendered with live data and matched the query results. Rendering without errors doesn't prove the numbers match your data. After you import the workbook, check a few panels against raw telemetry in Application Insights Logs, and use the telemetry health section to confirm data is arriving.
 
 ## Support
 
