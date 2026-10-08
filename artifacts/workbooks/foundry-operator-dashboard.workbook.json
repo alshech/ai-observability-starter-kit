@@ -1,0 +1,918 @@
+{
+  "version": "Notebook/1.0",
+  "items": [
+    {
+      "type": 1,
+      "content": {
+        "json": "# Foundry Operator Dashboard\n\n**Five questions this dashboard must answer without reconstructing the system manually (KP CPE Workshop Operator Build Guide):**\n1. Is the agent reachable and processing requests?\n2. Which inner operation failed: agent runtime, model call, tool call, or dependency?\n3. Is the agent behavior useful, safe, compliant, and aligned with its task?\n4. What is changing over time in latency, errors, tokens, cost, and evaluation scores?\n5. Who must act, through which channel, and using which runbook?\n\n| # | KPI area | Section |\n|---|---|---|\n| 1 | Token utilization | Tokens |\n| 2 | Latency / TTFB | Latency |\n| 3 | Error rates (incl. 4xx/5xx) | Errors |\n| 4 | Agent runs | Runs & Sessions |\n| 5 | Tool calls | Tools |\n| 6 | Success rates | Success |\n| 7 | Health status | Health |\n| 8 | Cost & capacity | Cost |\n| 9 | Hidden failures | Hidden Failures |\n| 10 | Quality & safety (static snapshot) | Quality & Safety |\n| 11 | Operational depth (alerts, dependencies, models) | Operations |\n| 12 | Usage patterns | Usage |\n| 13 | Telemetry & evaluation health | Telemetry Health |\n| 14 | KPI thresholds & ownership | Thresholds |\n| 15 | Known challenges & mitigations | Challenges |\n| 16 | Open governance decisions | Decisions |\n"
+      },
+      "name": "overview"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "**How to use this alongside the rest of the observability stack** (so operators pick the right surface for the job):\n\n| Surface | Best for |\n|---|---|\n| Application Insights Agents pane | Fastest per-agent health check; expect portal rollup lag |\n| **This Workbook** | KP-specific operational + governance view: combined KQL, context, ownership, thresholds |\n| Grafana for Azure Monitor | Reusable cross-project operational dashboard with env/project filters |\n| Log Analytics / KQL | Root-cause investigation — start from a trace ID, pivot to child dependencies |\n| Foundry Evaluations | Quality/safety/compliance evidence, trended across releases |\n| Alert rules / action groups | Accountability and paging — only for actionable symptoms |\n",
+        "style": "info"
+      },
+      "name": "consumption-model-note"
+    },
+    {
+      "type": 9,
+      "content": {
+        "version": "KqlParameterItem/1.0",
+        "parameters": [
+          {
+            "id": "a1b2c3d4-0001-4000-8000-000000000001",
+            "version": "KqlParameterItem/1.0",
+            "name": "TimeRange",
+            "type": 4,
+            "isRequired": true,
+            "value": {
+              "durationMs": 86400000
+            },
+            "typeSettings": {
+              "selectableValues": [
+                {
+                  "durationMs": 900000
+                },
+                {
+                  "durationMs": 1800000
+                },
+                {
+                  "durationMs": 3600000
+                },
+                {
+                  "durationMs": 14400000
+                },
+                {
+                  "durationMs": 43200000
+                },
+                {
+                  "durationMs": 86400000
+                },
+                {
+                  "durationMs": 259200000
+                },
+                {
+                  "durationMs": 604800000
+                },
+                {
+                  "durationMs": 1209600000
+                },
+                {
+                  "durationMs": 2592000000
+                }
+              ]
+            }
+          }
+        ],
+        "style": "pills",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components"
+      },
+      "name": "parameters - time range"
+    },
+    {
+      "type": 9,
+      "content": {
+        "version": "KqlParameterItem/1.0",
+        "parameters": [
+          {
+            "id": "b2c3d4e5-0002-4000-8000-000000000003",
+            "version": "KqlParameterItem/1.0",
+            "name": "Subscriptions",
+            "label": "Subscription(s)",
+            "type": 6,
+            "isRequired": true,
+            "multiSelect": true,
+            "quote": "'",
+            "delimiter": ",",
+            "typeSettings": {
+              "additionalResourceOptions": [
+                "value::all"
+              ],
+              "includeAll": false,
+              "showDefault": false
+            },
+            "defaultValue": "value::all"
+          },
+          {
+            "id": "b2c3d4e5-0002-4000-8000-000000000002",
+            "version": "KqlParameterItem/1.0",
+            "name": "AppInsightsResources",
+            "label": "Foundry project(s) (App Insights)",
+            "type": 5,
+            "isRequired": true,
+            "multiSelect": true,
+            "quote": "'",
+            "delimiter": ",",
+            "query": "Resources\r\n| where type =~ 'microsoft.insights/components'\r\n| order by name asc\r\n| project value = id, label = name, selected = id =~ '/subscriptions/79c353dc-0e60-45ed-9b2a-b0dea933c798/resourceGroups/rg-ai-obs-kit/providers/microsoft.insights/components/appi-qv5a2wfxrzxe2', group = resourceGroup",
+            "crossComponentResources": [
+              "{Subscriptions}"
+            ],
+            "typeSettings": {
+              "additionalResourceOptions": [],
+              "showDefault": false
+            },
+            "queryType": 1,
+            "resourceType": "microsoft.resourcegraph/resources"
+          }
+        ],
+        "style": "pills",
+        "queryType": 1,
+        "resourceType": "microsoft.resourcegraph/resources"
+      },
+      "name": "parameters - project selector"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "**Pick one or more Foundry projects (Application Insights resources)** above to scope this entire dashboard — select a single project for a focused operator view, or multiple to compare projects side by side. Table panels below include a **project** column so rows stay distinguishable when more than one is selected; trend charts show combined volume across all selected projects by default. The **Subscription(s)** selector scopes the Resource Graph inventory panels (alert rules, model deployments) independently, since those can span projects within a subscription.",
+        "style": "info"
+      },
+      "name": "project-selector-note"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "## 📊 At a Glance\nKey performance indicators for the selected time range. **Error Rate** and **P95 Latency** are the two to watch first — if either spikes, drill into the **Error Rates** or **Latency** sections below."
+      },
+      "name": "kpi-header"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let reqs = requests | where name has \"invoke_agent\";\nlet dchat = dependencies | where name startswith \"chat \";\nlet dtool = dependencies | where name startswith \"execute_tool\";\nunion\n(reqs | summarize Value = toreal(count()) | extend Metric = \"Agent Runs\", Fmt = \"short\"),\n(reqs | summarize Value = iff(count() == 0, 0.0, round(100.0 * countif(success == true) / count(), 2)) | extend Metric = \"Success Rate (%)\", Fmt = \"pct\"),\n(reqs | summarize Value = iff(count() == 0, 0.0, round(100.0 * countif(success == false) / count(), 2)) | extend Metric = \"Error Rate (%)\", Fmt = \"pct\"),\n(reqs | summarize Value = round(percentile(duration, 95), 1) | extend Metric = \"P95 Latency (ms)\", Fmt = \"ms\"),\n(dtool | summarize Value = toreal(count()) | extend Metric = \"Tool Calls\", Fmt = \"short\"),\n(dchat | extend intok = todouble(customDimensions[\"gen_ai.usage.input_tokens\"]), outtok = todouble(customDimensions[\"gen_ai.usage.output_tokens\"]) | summarize Value = round(sum(intok) + sum(outtok), 0) | extend Metric = \"Total Tokens\", Fmt = \"short\")\n| project Metric, Value",
+        "size": 3,
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "{AppInsightsResources}"
+        ],
+        "visualization": "tiles",
+        "tileSettings": {
+          "showBorder": true,
+          "titleContent": {
+            "columnMatch": "Metric",
+            "formatter": 1
+          },
+          "leftContent": {
+            "columnMatch": "Value",
+            "formatter": 12,
+            "formatOptions": {
+              "palette": "auto"
+            },
+            "numberFormat": {
+              "unit": 17,
+              "options": {
+                "maximumFractionDigits": 2
+              }
+            }
+          }
+        }
+      },
+      "name": "kpi-tiles"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "---\n## 1️⃣ Token Utilization\nTracks GenAI input + output token consumption by model. Use this to spot cost spikes or a model that is unexpectedly verbose. Data comes from `chat <model>` dependency spans' `gen_ai.usage.input_tokens` / `gen_ai.usage.output_tokens` attributes."
+      },
+      "name": "section-tokens-header"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "dependencies\n| where name startswith \"chat \"\n| extend model = tostring(split(name, ' ')[1])\n| extend input_tokens = todouble(customDimensions[\"gen_ai.usage.input_tokens\"])\n| extend output_tokens = todouble(customDimensions[\"gen_ai.usage.output_tokens\"])\n| summarize total_tokens = sum(input_tokens) + sum(output_tokens) by bin(timestamp, 5m), model\n| order by timestamp asc",
+        "size": 0,
+        "title": "Token usage over time, by model",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "{AppInsightsResources}"
+        ],
+        "visualization": "timechart"
+      },
+      "name": "tokens-timechart"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "dependencies\n| where name startswith \"chat \"\n| extend model = tostring(split(name, ' ')[1])\n| extend input_tokens = todouble(customDimensions[\"gen_ai.usage.input_tokens\"])\n| extend output_tokens = todouble(customDimensions[\"gen_ai.usage.output_tokens\"])\n| extend foundryProject = tostring(split(_ResourceId, \"/\")[8])\n| summarize calls = count(), total_input = sum(input_tokens), total_output = sum(output_tokens), avg_input = round(avg(input_tokens), 1), avg_output = round(avg(output_tokens), 1) by foundryProject, model\n| extend total_tokens = total_input + total_output\n| order by total_tokens desc",
+        "size": 0,
+        "title": "Token totals and averages by model",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "{AppInsightsResources}"
+        ],
+        "visualization": "table"
+      },
+      "name": "tokens-table"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "---\n## 2️⃣ Latency (TTFB)\nEnd-to-end agent latency (full request) and model-call latency (our closest proxy for streaming responsiveness)."
+      },
+      "name": "section-latency-header"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "requests\n| where name has \"invoke_agent\"\n| summarize p50 = percentile(duration, 50), p90 = percentile(duration, 90), p95 = percentile(duration, 95) by bin(timestamp, 5m)\n| order by timestamp asc",
+        "size": 0,
+        "title": "End-to-end agent latency (ms) — p50 / p90 / p95",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "{AppInsightsResources}"
+        ],
+        "visualization": "timechart"
+      },
+      "name": "latency-e2e-timechart"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "ℹ️ **Why \"proxy\"?** Instrumentation emits one span per full model call, not per streamed token, so there is no literal \"time to first token\" signal. The closest available signal is the **duration of the `chat <model>` dependency span**, used below as the TTFB proxy. True client-perceived time-to-first-visible-token would require instrumenting the streaming/client layer directly.",
+        "style": "info"
+      },
+      "name": "latency-ttfb-note"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "dependencies\n| where name startswith \"chat \"\n| extend model = tostring(split(name, ' ')[1])\n| summarize p50_ms = round(percentile(duration, 50), 1), p95_ms = round(percentile(duration, 95), 1) by model\n| order by p95_ms desc",
+        "size": 0,
+        "title": "Model-call latency (TTFB proxy, ms) — p50 / p95 by model",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "{AppInsightsResources}"
+        ],
+        "visualization": "barchart"
+      },
+      "name": "latency-ttfb-barchart"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "---\n## 3️⃣ Error Rates\nFailure percentage overall, over time, and by agent. The `agent-framework-agent-broken-model` agent is expected to run at ~100% error rate — exclude it mentally when judging overall platform health (see Health Status section for an agent-aware view)."
+      },
+      "name": "section-errors-header"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "requests\n| where name has \"invoke_agent\"\n| extend agent = tostring(customDimensions[\"gen_ai.agent.name\"])\n| extend agent = iff(isempty(agent), \"unknown-agent\", agent)\n| extend outcome = iff(success == true, \"success\", \"error\")\n| summarize count() by bin(timestamp, 5m), agent, outcome\n| order by timestamp asc",
+        "size": 0,
+        "title": "Agent run volume over time, by agent and outcome",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "{AppInsightsResources}"
+        ],
+        "visualization": "timechart"
+      },
+      "name": "errors-timechart"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "requests\n| where name has \"invoke_agent\"\n| extend agent = tostring(customDimensions[\"gen_ai.agent.name\"])\n| extend agent = iff(isempty(agent), \"unknown-agent\", agent)\n| extend foundryProject = tostring(split(_ResourceId, \"/\")[8])\n| summarize total = count(), failed = countif(success == false) by foundryProject, agent\n| extend error_rate_pct = round(100.0 * failed / total, 2)\n| order by error_rate_pct desc",
+        "size": 0,
+        "title": "Error rate (%) by agent",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "{AppInsightsResources}"
+        ],
+        "visualization": "table",
+        "gridSettings": {
+          "formatters": [
+            {
+              "columnMatch": "error_rate_pct",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "colors",
+                "thresholdsGrid": [
+                  {
+                    "operator": ">=",
+                    "thresholdValue": "20",
+                    "representation": "redBright",
+                    "text": "{0}%"
+                  },
+                  {
+                    "operator": ">=",
+                    "thresholdValue": "5",
+                    "representation": "yellow",
+                    "text": "{0}%"
+                  },
+                  {
+                    "operator": "Default",
+                    "representation": "green",
+                    "text": "{0}%"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "name": "errors-by-agent-table"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "requests\n| where name has \"invoke_agent\" and success == false\n| extend agent = tostring(customDimensions[\"gen_ai.agent.name\"])\n| extend agent = iff(isempty(agent), \"unknown-agent\", agent)\n| extend foundryProject = tostring(split(_ResourceId, \"/\")[8])\n| summarize errors = count() by foundryProject, agent, resultCode\n| order by errors desc",
+        "size": 0,
+        "title": "Top error codes by agent",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "{AppInsightsResources}"
+        ],
+        "visualization": "table"
+      },
+      "name": "errors-top-codes-table"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "requests\n| where name has \"invoke_agent\" and success == false\n| extend agent = tostring(customDimensions[\"gen_ai.agent.name\"])\n| extend agent = iff(isempty(agent), \"unknown-agent\", agent)\n| extend error_class = case(resultCode startswith \"4\", \"4xx (client/config error)\", resultCode startswith \"5\", \"5xx (server/backend error)\", \"other\")\n| summarize count() by agent, error_class\n| order by agent asc",
+        "size": 0,
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "{AppInsightsResources}"
+        ],
+        "visualization": "columnchart",
+        "title": "Invocation errors by class (4xx vs 5xx), by agent"
+      },
+      "name": "errors-4xx5xx"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "---\n## 4️⃣ Agent Runs\nInvocation volume (reuses the run-rate chart above) plus a session/turn breakdown — how many turns each conversation (`operation_Id`) had, per agent. Useful for spotting runaway loops or unusually long conversations."
+      },
+      "name": "section-runs-header"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "requests\n| where name has \"invoke_agent\"\n| extend agent = tostring(customDimensions[\"gen_ai.agent.name\"])\n| extend agent = iff(isempty(agent), \"unknown-agent\", agent)\n| summarize turns = count(), last_seen = max(timestamp) by trace_id = operation_Id, agent\n| order by turns desc\n| take 50",
+        "size": 0,
+        "title": "Sessions: turn count per conversation (top 50)",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "{AppInsightsResources}"
+        ],
+        "visualization": "table"
+      },
+      "name": "runs-sessions-table"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "---\n## 5️⃣ Tool Calls\nVolume, latency, and error rate of function/tool invocations (`execute_tool` dependency spans) — e.g. order lookups, supplier lookups. Spikes in tool latency or tool error rate often precede agent-level errors."
+      },
+      "name": "section-tools-header"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "dependencies\n| where name startswith \"execute_tool\"\n| summarize count() by bin(timestamp, 5m)\n| order by timestamp asc",
+        "size": 0,
+        "title": "Tool call volume over time",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "{AppInsightsResources}"
+        ],
+        "visualization": "timechart"
+      },
+      "name": "tools-volume-timechart"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "dependencies\n| where name startswith \"execute_tool\"\n| extend tool = tostring(customDimensions[\"gen_ai.tool.name\"])\n| extend tool = iff(isempty(tool), name, tool)\n| extend foundryProject = tostring(split(_ResourceId, \"/\")[8])\n| summarize calls = count(), p95_ms = round(percentile(duration, 95), 1), errors = countif(success == false) by foundryProject, tool\n| extend error_rate_pct = round(100.0 * errors / calls, 2)\n| order by calls desc",
+        "size": 0,
+        "title": "Tool calls, p95 latency and error rate, by tool",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "{AppInsightsResources}"
+        ],
+        "visualization": "table",
+        "gridSettings": {
+          "formatters": [
+            {
+              "columnMatch": "error_rate_pct",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "colors",
+                "thresholdsGrid": [
+                  {
+                    "operator": ">=",
+                    "thresholdValue": "20",
+                    "representation": "redBright",
+                    "text": "{0}%"
+                  },
+                  {
+                    "operator": ">=",
+                    "thresholdValue": "5",
+                    "representation": "yellow",
+                    "text": "{0}%"
+                  },
+                  {
+                    "operator": "Default",
+                    "representation": "green",
+                    "text": "{0}%"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "name": "tools-latency-errors-table"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "---\n## 6️⃣ Success Rates\nPer-agent success percentage, sorted worst-first so regressions surface immediately."
+      },
+      "name": "section-success-header"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "requests\n| where name has \"invoke_agent\"\n| extend agent = tostring(customDimensions[\"gen_ai.agent.name\"])\n| extend agent = iff(isempty(agent), \"unknown-agent\", agent)\n| summarize total = count(), success = countif(success == true) by agent\n| extend success_rate_pct = round(100.0 * success / total, 2)\n| order by success_rate_pct asc",
+        "size": 0,
+        "title": "Success rate (%) by agent",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "{AppInsightsResources}"
+        ],
+        "visualization": "barchart",
+        "gridSettings": {
+          "formatters": [
+            {
+              "columnMatch": "success_rate_pct",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "colors",
+                "thresholdsGrid": [
+                  {
+                    "operator": "<",
+                    "thresholdValue": "80",
+                    "representation": "redBright",
+                    "text": "{0}%"
+                  },
+                  {
+                    "operator": "<",
+                    "thresholdValue": "95",
+                    "representation": "yellow",
+                    "text": "{0}%"
+                  },
+                  {
+                    "operator": "Default",
+                    "representation": "green",
+                    "text": "{0}%"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "name": "success-rate-barchart"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "---\n## 7️⃣ Health Status\nComposite status per agent, combining recency, error rate and latency:\n\n| Status | Meaning |\n|---|---|\n| 🟢 Healthy | Seen recently, error rate < 5%, p95 latency ≤ 15s |\n| 🟡 Degraded | Seen recently, error rate 5–20% or p95 latency > 15s |\n| 🔴 Down | Seen recently, error rate ≥ 20% |\n| ⚪ No Recent Activity | No invocations in the last 60 minutes |"
+      },
+      "name": "section-health-header"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "requests\n| where name has \"invoke_agent\"\n| extend agent = tostring(customDimensions[\"gen_ai.agent.name\"])\n| extend agent = iff(isempty(agent), \"unknown-agent\", agent)\n| extend foundryProject = tostring(split(_ResourceId, \"/\")[8])\n| summarize last_seen = max(timestamp), total = count(), failed = countif(success == false), p95_ms = percentile(duration, 95) by foundryProject, agent\n| extend minutes_since_last_seen = round(datetime_diff('minute', now(), last_seen), 1)\n| extend error_rate_pct = round(100.0 * failed / total, 2)\n| extend p95_ms = round(p95_ms, 1)\n| extend Status = case(\n    minutes_since_last_seen > 60, \"⚪ No Recent Activity\",\n    error_rate_pct >= 20, \"🔴 Down\",\n    error_rate_pct >= 5 or p95_ms > 15000, \"🟡 Degraded\",\n    \"🟢 Healthy\"\n  )\n| project foundryProject, agent, Status, error_rate_pct, p95_ms, minutes_since_last_seen, last_seen\n| order by Status asc",
+        "size": 0,
+        "title": "Composite health status by agent",
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "{AppInsightsResources}"
+        ],
+        "visualization": "table"
+      },
+      "name": "health-status-table"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "⚠️ `agent-framework-agent-broken-model` is *expected* to show 🔴 Down — an intentional negative-test agent wired to a bad deployment, not a real incident.",
+        "style": "warning"
+      },
+      "name": "health-broken-model-note"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "---\n## 8️⃣ Cost & Capacity\nEstimated spend by model, budget burn-down, and throttling (HTTP 429) on calls to the Foundry endpoint."
+      },
+      "name": "section-cost-header"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let pricing = datatable(model:string, in_per_1k:real, out_per_1k:real)\n[\n  \"gpt-4o-mini\", 0.00015, 0.0006,\n  \"gpt-4.1-mini\", 0.002, 0.008,\n  \"gpt-5-mini\", 0.00025, 0.002\n];\ndependencies\n| where name startswith \"chat \"\n| extend model = tostring(split(name, ' ')[1])\n| extend input_tokens = todouble(customDimensions[\"gen_ai.usage.input_tokens\"])\n| extend output_tokens = todouble(customDimensions[\"gen_ai.usage.output_tokens\"])\n| join kind=leftouter pricing on model\n| extend est_cost_usd = (input_tokens / 1000.0 * in_per_1k) + (output_tokens / 1000.0 * out_per_1k)\n| summarize est_cost_usd = round(sum(est_cost_usd), 4) by bin(timestamp, 1h), model\n| order by timestamp asc",
+        "size": 0,
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "{AppInsightsResources}"
+        ],
+        "visualization": "timechart",
+        "title": "Estimated spend ($) over time, by model"
+      },
+      "name": "cost-timechart"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let pricing = datatable(model:string, in_per_1k:real, out_per_1k:real)\n[\n  \"gpt-4o-mini\", 0.00015, 0.0006,\n  \"gpt-4.1-mini\", 0.002, 0.008,\n  \"gpt-5-mini\", 0.00025, 0.002\n];\ndependencies\n| where name startswith \"chat \"\n| extend model = tostring(split(name, ' ')[1])\n| extend input_tokens = todouble(customDimensions[\"gen_ai.usage.input_tokens\"])\n| extend output_tokens = todouble(customDimensions[\"gen_ai.usage.output_tokens\"])\n| join kind=leftouter pricing on model\n| extend est_cost_usd = (input_tokens / 1000.0 * in_per_1k) + (output_tokens / 1000.0 * out_per_1k)\n| extend foundryProject = tostring(split(_ResourceId, \"/\")[8])\n| summarize calls = count(), input_tokens = sum(input_tokens), output_tokens = sum(output_tokens), est_cost_usd = round(sum(est_cost_usd), 4) by foundryProject, model\n| order by est_cost_usd desc",
+        "size": 0,
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "{AppInsightsResources}"
+        ],
+        "visualization": "table",
+        "title": "Estimated spend totals by model"
+      },
+      "name": "cost-table"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let MONTHLY_BUDGET_USD = 50.0; // 🔧 set your approved monthly budget here\nlet pricing = datatable(model:string, in_per_1k:real, out_per_1k:real)\n[ \"gpt-4o-mini\", 0.00015, 0.0006, \"gpt-4.1-mini\", 0.002, 0.008, \"gpt-5-mini\", 0.00025, 0.002 ];\nlet mtd_cost = toscalar(\n  dependencies | where name startswith \"chat \" and timestamp > startofmonth(now())\n  | extend model = tostring(split(name, ' ')[1])\n  | extend input_tokens = todouble(customDimensions[\"gen_ai.usage.input_tokens\"])\n  | extend output_tokens = todouble(customDimensions[\"gen_ai.usage.output_tokens\"])\n  | join kind=leftouter pricing on model\n  | summarize sum((input_tokens / 1000.0 * in_per_1k) + (output_tokens / 1000.0 * out_per_1k))\n);\nprint Metric = \"Month-to-date est. spend (USD)\", Value = round(mtd_cost, 4), Budget = MONTHLY_BUDGET_USD, PctOfBudget = round(100.0 * mtd_cost / MONTHLY_BUDGET_USD, 1), Status = case(mtd_cost >= MONTHLY_BUDGET_USD, \"🔴 Over budget\", mtd_cost >= 0.8 * MONTHLY_BUDGET_USD, \"🟡 >=80% of budget\", \"🟢 On track\")",
+        "size": 0,
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "{AppInsightsResources}"
+        ],
+        "visualization": "table",
+        "title": "Month-to-date spend vs. approved budget (edit MONTHLY_BUDGET_USD in the query)"
+      },
+      "name": "cost-budget-burndown"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "ℹ️ **Cost figures are estimates** using public pay-as-you-go list prices as of writing (`gpt-4o-mini`: $0.00015/$0.0006 per 1K in/out tokens; `gpt-4.1-mini`: $0.002/$0.008; `gpt-5-mini`: $0.00025/$0.002). Reconcile against **Azure Cost Management** for actuals; edit `pricing` / `MONTHLY_BUDGET_USD` above for your rates.",
+        "style": "info"
+      },
+      "name": "cost-budget-note"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "dependencies\n| where type == \"HTTP\"\n| summarize calls = count(), throttled_429 = countif(resultCode == \"429\") by bin(timestamp, 5m)\n| extend throttle_rate_pct = round(iff(calls == 0, 0.0, 100.0 * throttled_429 / calls), 2)\n| order by timestamp asc",
+        "size": 0,
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "{AppInsightsResources}"
+        ],
+        "visualization": "timechart",
+        "title": "HTTP dependency calls (all targets) vs. 429 (throttled) responses"
+      },
+      "name": "throttling-timechart"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "---\n## 🔟 Hidden Failures (Parent-Child Dependency Failures)\nA **successful** `invoke_agent` run can still contain a **failed** tool or model call underneath it — the agent may catch and recover from it, or silently ignore it. Our basic alert rules only check top-level `requests.success`, so **they cannot see these**. This section surfaces runs that reported success but had at least one failed child dependency underneath, so operators can decide whether \"recovered\" failures also need attention.",
+        "style": "warning"
+      },
+      "name": "section-hidden-failures-header"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let failed_children = dependencies\n| where success == false\n| project operation_Id, dep_name = name, dep_resultCode = resultCode;\nrequests\n| where name has \"invoke_agent\" and success == true\n| extend agent = tostring(customDimensions[\"gen_ai.agent.name\"])\n| extend agent = iff(isempty(agent), \"unknown-agent\", agent)\n| extend foundryProject = tostring(split(_ResourceId, \"/\")[8])\n| join kind=inner failed_children on operation_Id\n| summarize hidden_failures = count(), failed_dependencies = make_set(dep_name, 10) by foundryProject, agent\n| order by hidden_failures desc",
+        "size": 0,
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "{AppInsightsResources}"
+        ],
+        "visualization": "table",
+        "title": "Successful runs with a failed child dependency, by agent"
+      },
+      "name": "hidden-failures-table"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let failed_children = dependencies | where success == false | project operation_Id;\nlet total_success = toscalar(requests | where name has \"invoke_agent\" and success == true | summarize count());\nlet hidden = toscalar(requests | where name has \"invoke_agent\" and success == true | join kind=inner failed_children on operation_Id | summarize dcount(operation_Id));\nprint Metric = \"Hidden failure rate\", SuccessfulRuns = total_success, RunsWithFailedChild = hidden, HiddenFailureRatePct = iff(total_success == 0, 0.0, round(100.0 * hidden / total_success, 2))",
+        "size": 0,
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "{AppInsightsResources}"
+        ],
+        "visualization": "table",
+        "title": "Overall hidden failure rate"
+      },
+      "name": "hidden-failures-rate"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "---\n## 9⃣⃣ Quality & Safety\n> ℹ️ **Why static, not live?** Continuous evaluation scores and red-team scan results are produced by the Azure AI Foundry **Evaluations** service, not by the OpenTelemetry pipeline that feeds this Application Insights resource — so they cannot be queried live with KQL here. The table below is a **point-in-time snapshot** of the last recorded runs (from `artifacts/redteam-run-final.json`). For live, up-to-date scores always check the **Foundry portal → Evaluations** pane linked below.\n\n| Check | Last known result |\n|---|---|\n| Continuous eval rule | `demo-continuous-eval` — runs `intent_resolution`, `tool_call_accuracy`, `violence` evaluators on every response from `agent-framework-agent-basic-responses` |\n| Red-team scan (last run) | 54 attack attempts — **30 passed**, **24 failed**, 0 errored (attack strategies: Flip, Base64; evaluators: Prohibited Actions, Task Adherence, Sensitive Data Leakage) |\n\nA **failed** red-team attempt means the attack technique successfully got the model to violate the tested policy — treat a rising failed-count trend across scans as a regression signal, not a one-time score.\n\n**Re-run:** `python scripts\\10-continuous-eval.py` (continuous eval setup) · `python scripts\\12-red-team.py` (red-team scan)"
+      },
+      "name": "section-quality-header"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "---\n## 1️⃣0️⃣ Operational Depth\nAlert rule inventory, a live self-check of whether those rules *would* be firing right now, external dependency health (calls from the agents to the Azure AI Foundry endpoint), and the current model deployment inventory."
+      },
+      "name": "section-ops-header"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "Resources\n| where type =~ 'microsoft.insights/scheduledqueryrules'\n| where resourceGroup =~ 'rg-ai-obs-kit'\n| project name, severity = properties.severity, enabled = properties.enabled, description = properties.description",
+        "size": 0,
+        "queryType": 1,
+        "resourceType": "microsoft.resourcegraph/resources",
+        "crossComponentResources": [
+          "{Subscriptions}"
+        ],
+        "visualization": "table",
+        "title": "Configured alert rules"
+      },
+      "name": "ops-alert-rules"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let err = toscalar(requests | where timestamp > ago(15m) | where name has \"invoke_agent\" | where success == false | summarize n = count());\nlet lat = toscalar(requests | where timestamp > ago(15m) | where name has \"invoke_agent\" | summarize p95 = percentile(duration, 95));\nprint AlertRule = \"invoke_agent errors > 0 (last 15m)\", CurrentValue = tostring(err), Threshold = \"> 0\", WouldFireNow = iff(err > 0, \"🔴 Yes\", \"🟢 No\")\n| union (print AlertRule = \"invoke_agent p95 latency > 30s (last 15m)\", CurrentValue = strcat(tostring(round(lat, 0)), \"ms\"), Threshold = \"> 30000ms\", WouldFireNow = iff(lat > 30000, \"🔴 Yes\", \"🟢 No\"))",
+        "size": 0,
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "{AppInsightsResources}"
+        ],
+        "visualization": "table",
+        "title": "Live self-check: would these alerts be firing right now?"
+      },
+      "name": "ops-alert-self-check"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "**Required alert payload** — check that both configured alert rules' action groups actually carry this, not just the raw threshold breach:\n- Environment, project, agent name and version\n- Affected model deployment or tool\n- Time window, count/rate, threshold and severity\n- Representative trace IDs and direct resource links\n- Runbook link and owning team\n- Change/deployment context when available\n\nThe 7 deployed rules (e.g. `alert-gen-ai-errors-15m`, `alert-gen-ai-p95-latency-15m`) carry threshold, window and severity via the scheduled-query rule itself, but **do not yet attach a runbook link, owning team, or representative trace ID** in the action group payload — worth adding before relying on paging alone.",
+        "style": "warning"
+      },
+      "name": "ops-alert-payload-checklist"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "dependencies\n| where type in (\"HTTP\", \"AI\")\n| extend foundryProject = tostring(split(_ResourceId, \"/\")[8])\n| summarize calls = count(), success_rate_pct = round(100.0 * countif(success == true) / count(), 2), p95_ms = round(percentile(duration, 95), 1) by foundryProject, type, target\n| order by calls desc",
+        "size": 0,
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "{AppInsightsResources}"
+        ],
+        "visualization": "table",
+        "title": "External dependency health (all outbound HTTP/AI targets; find your Foundry endpoint by target)",
+        "gridSettings": {
+          "formatters": [
+            {
+              "columnMatch": "success_rate_pct",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "colors",
+                "thresholdsGrid": [
+                  {
+                    "operator": "<",
+                    "thresholdValue": "80",
+                    "representation": "redBright",
+                    "text": "{0}%"
+                  },
+                  {
+                    "operator": "<",
+                    "thresholdValue": "95",
+                    "representation": "yellow",
+                    "text": "{0}%"
+                  },
+                  {
+                    "operator": "Default",
+                    "representation": "green",
+                    "text": "{0}%"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "name": "ops-dependency-health"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "Resources\n| where type =~ 'microsoft.cognitiveservices/accounts/deployments'\n| where resourceGroup =~ 'rg-ai-obs-kit'\n| project name, model = properties.model.name, version = properties.model.version, sku = sku.name, capacity = sku.capacity, provisioningState = properties.provisioningState",
+        "size": 0,
+        "queryType": 1,
+        "resourceType": "microsoft.resourcegraph/resources",
+        "crossComponentResources": [
+          "{Subscriptions}"
+        ],
+        "visualization": "table",
+        "title": "Deployed model inventory (SKU / capacity / version)"
+      },
+      "name": "ops-model-inventory"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "---\n## 1️⃣1️⃣ Usage Patterns\nConversation length distribution (turns per session) and a same-day-vs-baseline volume check to surface unusual spikes or drops early."
+      },
+      "name": "section-usage-header"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "requests\n| where name has \"invoke_agent\"\n| summarize turns = count() by operation_Id\n| summarize sessions = count() by turns\n| order by turns asc",
+        "size": 0,
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "{AppInsightsResources}"
+        ],
+        "visualization": "barchart",
+        "title": "Conversation length distribution (turns per session)"
+      },
+      "name": "usage-conversation-length"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "let last24h = toscalar(requests | where timestamp > ago(1d) | where name has \"invoke_agent\" | summarize count());\nlet baseline_daily_avg = toscalar(requests | where timestamp between (ago(8d) .. ago(1d)) | where name has \"invoke_agent\" | summarize count()) / 7.0;\nprint Metric = \"Agent runs: last 24h vs. prior 7-day daily average\", Last24h = last24h, DailyAvg7d = round(baseline_daily_avg, 1), PctChange = iff(baseline_daily_avg == 0, 0.0, round(100.0 * (last24h - baseline_daily_avg) / baseline_daily_avg, 1))",
+        "size": 0,
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "{AppInsightsResources}"
+        ],
+        "visualization": "table",
+        "title": "Volume anomaly check"
+      },
+      "name": "usage-anomaly-check"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "---\n## 📡 Telemetry & Evaluation Health\nBefore trusting any chart above, check that the data feeding it is complete and fresh. This section covers **trace completeness**, **ingestion freshness**, and notes on **evaluation coverage** and **data handling**."
+      },
+      "name": "section-telemetry-health-header"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "union requests, dependencies\n| summarize last_ingested = max(timestamp)\n| extend minutes_since_last_event = round(datetime_diff('minute', now(), last_ingested), 1)\n| extend Status = iff(minutes_since_last_event > 60, \"🟡 Stale (>60min since last event)\", \"🟢 Fresh\")",
+        "size": 0,
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "{AppInsightsResources}"
+        ],
+        "visualization": "table",
+        "title": "Ingestion freshness: time since the last telemetry event"
+      },
+      "name": "telemetry-ingestion-freshness"
+    },
+    {
+      "type": 3,
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "requests\n| where name has \"invoke_agent\"\n| extend has_child = iff(operation_Id in ((dependencies | project operation_Id)), true, false)\n| summarize total = count(), with_children = countif(has_child == true)\n| extend trace_completeness_pct = round(100.0 * with_children / total, 2)",
+        "size": 0,
+        "timeContextFromParameter": "TimeRange",
+        "queryType": 0,
+        "resourceType": "microsoft.insights/components",
+        "crossComponentResources": [
+          "{AppInsightsResources}"
+        ],
+        "visualization": "table",
+        "title": "Trace completeness: % of agent runs with at least one child span (model/tool call)"
+      },
+      "name": "telemetry-trace-completeness"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "**Evaluation coverage** and **task completion / intent / groundedness / RAG quality** are produced by the Azure AI Foundry **Evaluations** service (continuous eval rule `demo-continuous-eval` runs `intent_resolution`, `tool_call_accuracy`, and `violence` on every response), not by this OpenTelemetry pipeline — so they can't be queried live with KQL here. Check the **Foundry portal → Evaluations** pane for live coverage %% and scores. **RAG/retrieval KPIs are N/A** for this agent — it uses function-calling tools, not a retrieval/RAG pattern.\n\n**Data handling:** no sensitive data is intentionally captured in span attributes; access to this workbook and the underlying Log Analytics workspace is governed by the resource group's RBAC role assignments."
+      },
+      "name": "telemetry-eval-coverage-note"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "---\n## ⚠️ Known Challenges & Operational Mitigations\n| Challenge | Operational impact | Mitigation |\n|---|---|---|\n| Missing child spans | Agents pane lacks models, tokens or tool calls | Confirm `ENABLE_INSTRUMENTATION=true`, redeploy, verify `AppDependencies` |\n| Portal rollup lag | Tiles appear empty even when raw telemetry exists | Use KQL/Grafana for near-term confirmation; widen the time range |\n| Continuous evaluation cadence | Rule can be enabled while runs remain absent | Use the verified batch-evaluation path for deterministic checks |\n| Sensitive content in traces | Potential regulated-data exposure | Decide capture/masking/RBAC/retention/audit policy before production; today `ENABLE_SENSITIVE_DATA=true` is demo-only |\n| Alert noise | Operators lose trust and ignore pages | Alert only on actionable symptoms; use severity, windows, suppression, clear ownership |\n| Evaluator scale differences | Scores misread or compared incorrectly across evaluators | Document scale, threshold and pass/fail logic per evaluator (`intent_resolution`, `tool_call_accuracy`, `violence`) |\n| Preview/SDK changes | Commands and portal paths may change | Pin tested versions; automate validation; keep prepared artifacts |\n"
+      },
+      "name": "section-challenges"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "---\n## 📋 KPI Thresholds & Ownership Reference\nIllustrative Warn/Page thresholds for this workload, mirroring the Foundry Operations KPI framework. **Tune these to your agreed SLOs** — defaults below are discussion starting points, not production commitments. Rate/percentile alerts need ≥100 eligible events per window; below that, rely on raw failed counts instead.\n\n| KPI | Definition | Warn | Page | Owner |\n|---|---|---|---|---|\n| Invocation error rate | Failed `invoke_agent` runs / all runs | >1%% for 15 min | >5%% for 10 min with user impact | App team |\n| End-to-end latency | p95 full-run duration | p95 >10s for 15 min | p95 >30s for 10 min if SLO breached | App team |\n| Streaming responsiveness (TTFB proxy) | p95 `chat <model>` span duration | p95 >2s for 15 min | Investigate backend/model | App team |\n| Model throttling | 429s / all model calls | >1%% for 15 min | >5%% for 10 min if retries fail | App team |\n| Tool failure rate | Failed `execute_tool` calls / attempts | >1%% for 15 min | >5%% if a critical workflow is blocked | App team |\n| Hidden failure rate | Successful runs with a failed child / successful runs | >1%% for 15 min | Include as a separate recovered-failure cohort | App team |\n| Red-team attack success | Successful adversarial attempts / evaluable attacks | Any new high-severity finding | Release gate: zero unresolved critical findings | Security + app team |\n| Cost per successful task | Attributed cost / verified successful outcomes | >20%% above matched baseline | Include failed attempts in total cost | App team / FinOps |\n| Budget consumption | Actual MTD spend vs. approved monthly budget | ≥80%% of budget | ≥100%% or projected overrun | FinOps |\n| Ingestion freshness | Time since last telemetry event | p95 lag >5 min for 15 min | No traces for 10 min with active traffic | Platform/CPE |\n\n**Escalation flow:** Dashboard/warning → app team inspects traces and records suspected cause → Page/incident if sustained user-impacting failure or SLO breach → CPE + app on-call contain and restore → Release gate blocks promotion until versioned eval/red-team evidence shows no unresolved critical findings."
+      },
+      "name": "section-thresholds-header"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "---\n## 🧭 Open Governance Decisions (KP Workshop)\nThese are **not yet decided** for this environment — flagged here so they aren't silently defaulted:\n- **Telemetry content:** which prompts, responses, tool inputs/outputs may be captured in each environment?\n- **Data controls:** retention, regional placement, RBAC, protected logs, audit expectations.\n- **SLOs:** availability, failure rate, latency, evaluation and risk thresholds by agent class.\n- **Ownership:** division of responsibility across CPE, application teams, model platform, security/RAI, tool owners.\n- **Routing:** action groups, Teams/email/ITSM destinations, severities, escalation paths.\n- **Release authority:** what happens when baseline quality, compliance or safety checks fail?\n- **Standardization:** which dashboards, KQL packs, alerts and runbooks are deployed by default per Foundry project?\n",
+        "style": "upsell"
+      },
+      "name": "section-decisions"
+    },
+    {
+      "type": 1,
+      "content": {
+        "json": "---\n### 🔧 Related tools\n- Infrastructure / RBAC / alert checks: `scripts\\validate-deployment.ps1` (26 automated checks)\n- Raw KQL export: `scripts\\13-telemetry-kql.py` → `artifacts\\telemetry.json`\n- Re-seed test traffic: `scripts\\run-e2e.ps1 -SkipPhases \"1,2,3,4,5,8,9,10,11,12,13\"`\n- Batch evaluation / red-team results: Foundry portal **Evaluations** pane"
+      },
+      "name": "footer"
+    }
+  ],
+  "styleSettings": {},
+  "$schema": "https://github.com/Microsoft/Application-Insights-Workbooks/blob/master/schema/workbook.json"
+}
