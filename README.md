@@ -25,7 +25,7 @@ For teams operating Foundry agents, start with the Azure Monitor workbook:
 
 - [`artifacts/workbooks/foundry-operator-dashboard.workbook.json`](artifacts/workbooks/foundry-operator-dashboard.workbook.json): importable workbook (health, latency, errors, tokens, cost, tools, hidden failures, telemetry health).
 - [`docs/FOUNDRY_OPERATOR_WORKBOOK.md`](docs/FOUNDRY_OPERATOR_WORKBOOK.md): every panel explained, plus import steps.
-- [`docs/FOUNDRY_OPERATOR_QUERY_REFERENCE.md`](docs/FOUNDRY_OPERATOR_QUERY_REFERENCE.md): the full KQL of all 29 queries with step-by-step explanations.
+- [`docs/FOUNDRY_OPERATOR_QUERY_REFERENCE.md`](docs/FOUNDRY_OPERATOR_QUERY_REFERENCE.md): the full KQL of all 30 queries with step-by-step explanations.
 - [`docs/FOUNDRY_OPERATOR_GUIDE.md`](docs/FOUNDRY_OPERATOR_GUIDE.md): how operators use it: routines, triage playbooks, thresholds, best practices.
 
 ## Quick Start

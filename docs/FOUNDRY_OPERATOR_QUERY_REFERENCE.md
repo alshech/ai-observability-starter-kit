@@ -2,14 +2,14 @@
 
 Every query in the [Foundry Operator Dashboard](FOUNDRY_OPERATOR_WORKBOOK.md), with the KQL, a step-by-step explanation, how to read the result, and the pitfalls. For day-to-day use, see the [Operator Guide](FOUNDRY_OPERATOR_GUIDE.md).
 
-There are 29 queries: 26 KQL panels against Application Insights, 2 Azure Resource Graph panels, and 1 Resource Graph parameter query. The workbook applies the time range from the `TimeRange` parameter to the KQL panels. The few panels with a fixed window (budget, self-check, anomaly check) say so.
+There are 30 queries: 26 KQL panels against Application Insights, 1 Azure Resource Graph panel (alert rules), 1 Azure Resource Manager (ARM) panel that reads model deployments through the REST API, and 2 Resource Graph queries that fill the project and account pickers. The workbook applies the time range from the `TimeRange` parameter to the KQL panels. The few panels with a fixed window (budget, self-check, anomaly check) say so.
 
-**Validation:** all 26 KQL queries were executed against a live Application Insights resource (Logs API, 30-day range), and the 3 Resource Graph queries were executed with `az graph query`. All ran without errors. The KQL shown here is checked line by line against the workbook JSON.
+**How it was tested:** all 26 KQL queries ran without errors against a live Application Insights resource (Logs API, over 24-hour, 7-day and 30-day windows). The Resource Graph queries ran without errors through the Resource Graph REST API. The ARM call behind the model inventory ran against a live Foundry account and returned its deployments with the JSON-path columns the panel uses. The workbook was also deployed as a separate workbook, and the deployed definition matched this repository's file. The KQL shown here is checked line by line against the workbook JSON.
 
 ## Contents
 
 1. [Building blocks used by many queries](#1-building-blocks)
-2. [Selection parameter](#2-selection-parameter)
+2. [Selection parameters](#2-selection-parameters)
 3. [At a glance](#3-at-a-glance)
 4. [Tokens](#4-tokens)
 5. [Latency](#5-latency)
@@ -67,7 +67,7 @@ Prices are USD per 1,000 tokens. They are the Azure list prices for **Global Sta
 
 ---
 
-## 2. Selection parameter
+## 2. Selection parameters
 
 ### `AppInsightsResources` (resource picker)
 
@@ -81,6 +81,19 @@ Resources
 - **Purpose:** fills the dropdown that chooses which Application Insights resources every panel reads.
 - **How it works:** Azure Resource Graph lists all Application Insights components you can see. `value` is the resource ID used as the query scope, `label` is the display name, and `group` groups the list by resource group. `selected = false` means nothing is pre-selected.
 - **Tune:** use `selected = id =~ '<resource id>'` to pre-select a default. Add `| where resourceGroup =~ '<rg>'` to shorten the list.
+
+### `FoundryAccount` (resource picker)
+
+```kusto
+Resources
+| where type =~ 'microsoft.cognitiveservices/accounts' and kind in~ ('AIServices', 'OpenAI')
+| order by name asc
+| project value = id, label = strcat(name, ' (', location, ')'), selected = false, group = resourceGroup
+```
+
+- **Purpose:** fills the dropdown that chooses which Foundry (or Azure OpenAI) account the model inventory panel lists.
+- **How it works:** Resource Graph lists the accounts of kind `AIServices` and `OpenAI` in the selected subscriptions. `value` is the full resource ID, which the inventory panel uses in its REST path. The parameter is single-select and its default is the first account in the list (`defaultValue` is `value::1`).
+- **Tune:** add `| where resourceGroup =~ '<rg>'` to shorten the list.
 
 ---
 
@@ -502,17 +515,29 @@ dependencies
 - **How it works:** keep outbound HTTP and AI calls, then group by project, type and target host, with call count, success rate and p95.
 - **Read it as:** a target with a falling success rate or rising p95 is the likely upstream cause. Check Azure Service Health for it.
 
-### `ops-model-inventory` (Azure Resource Graph)
+### `ops-model-inventory` (Azure Resource Manager API)
 
-```kusto
-Resources
-| where type =~ 'microsoft.cognitiveservices/accounts/deployments'
-| project name, model = properties.model.name, version = properties.model.version, sku = sku.name, capacity = sku.capacity, provisioningState = properties.provisioningState
+This panel is a REST call, not a query language. It uses the workbook's Azure Resource Manager data source:
+
+```http
+GET {FoundryAccount}/deployments?api-version=2024-10-01
 ```
 
-- **Purpose:** what is deployed: model, version, SKU, capacity and state.
+`{FoundryAccount}` is the resource ID chosen in the `FoundryAccount` parameter. The workbook reads the `value` array in the response and maps these JSON paths to table columns:
+
+| Column | JSON path |
+|---|---|
+| `deployment` | `$.name` |
+| `model` | `$.properties.model.name` |
+| `version` | `$.properties.model.version` |
+| `sku` | `$.sku.name` |
+| `capacity` | `$.sku.capacity` |
+| `provisioningState` | `$.properties.provisioningState` |
+
+- **Purpose:** what is deployed in one Foundry account: deployment name, model, version, SKU, capacity and state.
 - **Use it for:** confirming approved models and versions, spotting models nearing retirement, and checking that capacity matches the traffic you see in the throttling panel.
-- **Pitfalls:** it lists every deployment in the selected subscriptions. Narrow it with a `resourceGroup` filter.
+- **Why REST and not Resource Graph:** Resource Graph doesn't index model deployments (`accounts/deployments`), so a Resource Graph query for them returns no rows.
+- **Pitfalls:** it lists one account at a time, so change the `FoundryAccount` parameter to see another. You need Reader on the account. The deployment name can differ from the model: a deployment named `gpt-4o-mini` can serve a different model, so read the `model` column. `capacity` is in quota units. For most chat models one unit is 1,000 tokens per minute, but the ratio varies by model, so check the Foundry quota documentation for yours.
 
 ---
 
@@ -583,5 +608,6 @@ requests
 - **Application Insights:** open the resource, then **Logs**, paste a query, and set the time range in the picker. The queries start from `requests` and `dependencies`, so they run as written.
 - **Log Analytics workspace:** if the resource is workspace-based, the tables are `AppRequests` and `AppDependencies`, with columns such as `Name`, `Success`, `DurationMs`, `OperationId` and `Properties`. The queries need translating.
 - **Resource Graph panels** run in **Azure Resource Graph Explorer**, not in Logs.
+- **Model inventory** is a REST call. Run it with `az rest --method get --url "https://management.azure.com/<account resource id>/deployments?api-version=2024-10-01"`.
 - **Alerts:** to alert from a panel, copy the query into a scheduled-query rule and add a threshold. Use the `ops-alert-self-check` logic as the starting point.
 - **Scripts and APIs:** the same KQL runs through the Logs Query API (for example the `azure-monitor-query` Python package, `LogsQueryClient.query_resource`) against an Application Insights resource id.

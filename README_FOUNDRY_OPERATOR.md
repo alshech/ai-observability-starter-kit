@@ -11,7 +11,7 @@ This package contains the workbook and the documentation around it. Start with t
 | [`artifacts/workbooks/foundry-operator-dashboard.workbook.json`](artifacts/workbooks/foundry-operator-dashboard.workbook.json) | The workbook definition. Import it into Azure Monitor. | Whoever deploys it |
 | [`docs/FOUNDRY_OPERATOR_GUIDE.md`](docs/FOUNDRY_OPERATOR_GUIDE.md) | How operators use it: routines, triage playbooks, thresholds, best practices, limitations. | Operators and team leads |
 | [`docs/FOUNDRY_OPERATOR_WORKBOOK.md`](docs/FOUNDRY_OPERATOR_WORKBOOK.md) | Every section and panel explained, the data model, parameters, import steps, what to change per environment. | Operators and workbook owners |
-| [`docs/FOUNDRY_OPERATOR_QUERY_REFERENCE.md`](docs/FOUNDRY_OPERATOR_QUERY_REFERENCE.md) | The full KQL and Resource Graph text of all 29 queries, each with a step-by-step explanation and known pitfalls. | Anyone who edits or reuses a query |
+| [`docs/FOUNDRY_OPERATOR_QUERY_REFERENCE.md`](docs/FOUNDRY_OPERATOR_QUERY_REFERENCE.md) | The full KQL, Resource Graph and REST call text of all 30 queries, each with a step-by-step explanation and known pitfalls. | Anyone who edits or reuses a query |
 
 ## The five questions it answers
 
@@ -30,9 +30,9 @@ This package contains the workbook and the documentation around it. Start with t
 | Latency | End-to-end and per-model latency (p50, p95), and a time-to-first-token proxy |
 | Errors | Failures by layer: agent runs, model calls, tool calls, throttling (HTTP 429) |
 | Runs, tools and health | Run volume, tool performance, and a composite health status per agent (Healthy, Degraded, Down, No Recent Activity) |
-| Cost and capacity | Estimated spend by model, month-to-date budget burn-down, deployment inventory |
+| Cost and capacity | Estimated spend by model, month-to-date budget burn-down, throttling (HTTP 429) |
 | Hidden failures | Runs that report success but contain a failed model or tool call |
-| Operational depth | Alert rule inventory, alert self-check, usage anomaly check |
+| Operational depth | Alert rule inventory, live alert self-check, external dependency health, model deployment inventory |
 | Usage patterns | Conversation length distribution and a volume anomaly check (last 24 hours against the previous 7-day average) |
 | Telemetry health | Ingestion freshness and trace completeness, so you can trust the other panels |
 | Quality and safety | Pointers to the Foundry portal Evaluations and Red team views |
@@ -42,7 +42,7 @@ See [`docs/FOUNDRY_OPERATOR_WORKBOOK.md`](docs/FOUNDRY_OPERATOR_WORKBOOK.md) for
 ## Prerequisites
 
 - Foundry agents that send OpenTelemetry GenAI spans to an Application Insights resource. Hosted agents need `ENABLE_INSTRUMENTATION=true`.
-- Reader access on that Application Insights resource, and on the subscription for the two Azure Resource Graph panels (alert rules and model inventory).
+- Reader access on that Application Insights resource. Reader on the subscription is also needed for the alert-rules panel and the project and account pickers, and Reader on the Foundry account for the model inventory panel.
 - Permission to create workbooks in the resource group that holds the Application Insights resource.
 - At least 8 days of retained data for the usage anomaly check.
 
@@ -51,7 +51,7 @@ See [`docs/FOUNDRY_OPERATOR_WORKBOOK.md`](docs/FOUNDRY_OPERATOR_WORKBOOK.md) for
 1. In the Azure portal, open the **Application Insights** resource, then **Workbooks**, then **New**.
 2. Click **Advanced editor** (`</>`), switch to the **Gallery Template** tab, and paste the contents of [`foundry-operator-dashboard.workbook.json`](artifacts/workbooks/foundry-operator-dashboard.workbook.json).
 3. Click **Apply**, then **Save**. Choose a name, subscription and resource group.
-4. At the top of the workbook, choose your **Subscriptions** and one or more **AppInsightsResources**. The resource picker has no default, so the panels stay empty until you choose.
+4. At the top of the workbook, choose your **Subscriptions** and one or more **AppInsightsResources**. The resource picker has no default, so the panels stay empty until you choose. The **FoundryAccount** picker defaults to the first Foundry account. Change it to list the model deployments of another account.
 5. Set the **TimeRange**, then walk through the sections.
 6. Complete the checklist below before operators rely on it.
 
@@ -90,7 +90,7 @@ The complete list is in section 7 of the [operator guide](docs/FOUNDRY_OPERATOR_
 
 ## Validation status
 
-All 26 KQL queries and the 3 Azure Resource Graph queries were executed read-only against a live Foundry environment and ran without errors. Executing without errors doesn't prove the numbers match your data. After you import the workbook, check a few panels against raw telemetry in Application Insights Logs, and use the telemetry health section to confirm data is arriving.
+All 26 KQL queries, the Resource Graph queries and the model-inventory REST call were executed read-only against a live Foundry environment and ran without errors. The workbook was also deployed as a separate workbook, and the deployed definition matched the file in this package. Executing without errors doesn't prove the numbers match your data. After you import the workbook, check a few panels against raw telemetry in Application Insights Logs, and use the telemetry health section to confirm data is arriving.
 
 ## Support
 

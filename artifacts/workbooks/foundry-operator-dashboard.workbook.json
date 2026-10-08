@@ -116,6 +116,28 @@
             },
             "queryType": 1,
             "resourceType": "microsoft.resourcegraph/resources"
+          },
+          {
+            "id": "b2c3d4e5-0002-4000-8000-000000000004",
+            "version": "KqlParameterItem/1.0",
+            "name": "FoundryAccount",
+            "label": "Foundry account (model inventory)",
+            "type": 5,
+            "isRequired": true,
+            "multiSelect": false,
+            "query": "Resources\r\n| where type =~ 'microsoft.cognitiveservices/accounts' and kind in~ ('AIServices', 'OpenAI')\r\n| order by name asc\r\n| project value = id, label = strcat(name, ' (', location, ')'), selected = false, group = resourceGroup",
+            "crossComponentResources": [
+              "{Subscriptions}"
+            ],
+            "typeSettings": {
+              "additionalResourceOptions": [
+                "value::1"
+              ],
+              "showDefault": false
+            },
+            "defaultValue": "value::1",
+            "queryType": 1,
+            "resourceType": "microsoft.resourcegraph/resources"
           }
         ],
         "style": "pills",
@@ -127,7 +149,7 @@
     {
       "type": 1,
       "content": {
-        "json": "**Pick one or more Foundry projects (Application Insights resources)** above to scope this entire dashboard — select a single project for a focused operator view, or multiple to compare projects side by side. Table panels below include a **project** column so rows stay distinguishable when more than one is selected; trend charts show combined volume across all selected projects by default. The **Subscription(s)** selector scopes the Resource Graph inventory panels (alert rules, model deployments) independently, since those can span projects within a subscription.",
+        "json": "**Pick one or more Foundry projects (Application Insights resources)** above to scope this entire dashboard — select a single project for a focused operator view, or multiple to compare projects side by side. Table panels below include a **project** column so rows stay distinguishable when more than one is selected; trend charts show combined volume across all selected projects by default. The **Subscription(s)** selector scopes the alert-rules panel and the project and account pickers independently, since those can span projects within a subscription. The **Foundry account** selector chooses the account whose model deployments the inventory panel lists.",
         "style": "info"
       },
       "name": "project-selector-note"
@@ -782,15 +804,11 @@
       "type": 3,
       "content": {
         "version": "KqlItem/1.0",
-        "query": "Resources\n| where type =~ 'microsoft.cognitiveservices/accounts/deployments'\n| project name, model = properties.model.name, version = properties.model.version, sku = sku.name, capacity = sku.capacity, provisioningState = properties.provisioningState",
+        "query": "{\"version\":\"ARMEndpoint/1.0\",\"data\":null,\"headers\":[],\"method\":\"GET\",\"path\":\"{FoundryAccount}/deployments\",\"urlParams\":[{\"key\":\"api-version\",\"value\":\"2024-10-01\"}],\"batchDisabled\":false,\"transformers\":[{\"type\":\"jsonpath\",\"settings\":{\"tablePath\":\"$.value[*]\",\"columns\":[{\"path\":\"$.name\",\"columnid\":\"deployment\"},{\"path\":\"$.properties.model.name\",\"columnid\":\"model\"},{\"path\":\"$.properties.model.version\",\"columnid\":\"version\"},{\"path\":\"$.sku.name\",\"columnid\":\"sku\"},{\"path\":\"$.sku.capacity\",\"columnid\":\"capacity\"},{\"path\":\"$.properties.provisioningState\",\"columnid\":\"provisioningState\"}]}}]}",
         "size": 0,
-        "queryType": 1,
-        "resourceType": "microsoft.resourcegraph/resources",
-        "crossComponentResources": [
-          "{Subscriptions}"
-        ],
+        "queryType": 12,
         "visualization": "table",
-        "title": "Deployed model inventory (SKU / capacity / version)"
+        "title": "Deployed model inventory (selected Foundry account: deployment / model / SKU / capacity)"
       },
       "name": "ops-model-inventory"
     },

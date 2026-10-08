@@ -6,7 +6,7 @@ An Azure Monitor **workbook** that gives operators one page for the health, cost
 - **Query reference:** [`FOUNDRY_OPERATOR_QUERY_REFERENCE.md`](FOUNDRY_OPERATOR_QUERY_REFERENCE.md) has the full KQL of every query with a step-by-step explanation.
 - **Operator guide:** [`FOUNDRY_OPERATOR_GUIDE.md`](FOUNDRY_OPERATOR_GUIDE.md) explains how to use it day to day.
 - **Origin:** exported from a reference Foundry environment, with environment-specific IDs removed.
-- **Contents:** 56 items. About 30 are KQL panels, and the rest are headings, notes and parameters.
+- **Contents:** 56 items. 28 are query panels (26 KQL, 1 Resource Graph, 1 Azure Resource Manager call), and the rest are headings, notes and parameters.
 
 > The definition is stored as a workbook "gallery template" JSON (the `serializedData` value), so it can be imported in the portal or deployed from an ARM/Bicep template.
 
@@ -35,7 +35,8 @@ The agents run with `ENABLE_INSTRUMENTATION=true` and emit GenAI OpenTelemetry s
 | `dependencies` | `chat <model>` (one per model call) | Tokens (`gen_ai.usage.input_tokens` / `output_tokens`), model-call latency, cost. Model is parsed from the span name. |
 | `dependencies` | `execute_tool ...` (one per tool call) | Tool volume, latency and errors. Tool is `gen_ai.tool.name`. |
 | `dependencies` | `type` = `HTTP` / `AI` | Throttling (HTTP 429) and external dependency health. |
-| Azure Resource Graph | alert rules, model deployments | Operations inventory panels. |
+| Azure Resource Graph | alert rules, Application Insights resources, Foundry accounts | The alert-rules panel and the project and account pickers. |
+| Azure Resource Manager API | model deployments of one Foundry account | The model inventory panel. |
 
 `operation_Id` is the trace ID. It links a run in `requests` to its model and tool calls in `dependencies`. The "hidden failures" and "trace completeness" panels depend on that join.
 
@@ -46,8 +47,9 @@ Table panels add a `foundryProject` column, taken from `split(_ResourceId, "/")[
 | Parameter | Type | Purpose |
 |---|---|---|
 | `TimeRange` | time range picker, default 24 h | Applies to every query panel. |
-| `Subscriptions` | subscription picker | Scopes the two Resource Graph panels (alert rules, model inventory). |
+| `Subscriptions` | subscription picker | Scopes the alert-rules panel and the project and account pickers. |
 | `AppInsightsResources` | resource picker (Resource Graph query on `microsoft.insights/components`) | Selects which Foundry project(s) every KQL panel reads. No default: choose one or more after import. |
+| `FoundryAccount` | single-select resource picker (Resource Graph query on `microsoft.cognitiveservices/accounts`), defaults to the first account | Selects the Foundry account whose model deployments the inventory panel lists. |
 
 ## Sections and queries
 
@@ -139,10 +141,10 @@ A text note, not a live query. Evaluation scores and red-team results come from 
 ### 10. Operational depth
 | Panel | Source | What it shows |
 |---|---|---|
-| Configured alert rules | Resource Graph | Scheduled query rules in the resource group: name, severity, enabled, description |
+| Configured alert rules | Resource Graph | Scheduled query rules in the selected subscriptions: name, severity, enabled, description |
 | Live self-check | KQL | Whether the two main alerts would fire right now: any failed `invoke_agent` in the last 15 minutes, and p95 above 30 s in the last 15 minutes |
 | External dependency health | KQL | Calls, success rate and p95 per target for `HTTP` and `AI` dependencies |
-| Deployed model inventory | Resource Graph | Model deployments: model, version, SKU, capacity, provisioning state |
+| Deployed model inventory | Azure Resource Manager API | Deployments of the account chosen in `FoundryAccount`: deployment, model, version, SKU, capacity, provisioning state. Resource Graph doesn't index model deployments, so this panel calls the REST API. |
 
 A note lists the alert payload each action group should carry (environment, agent, trace IDs, runbook, owner).
 
@@ -166,7 +168,7 @@ Check these before trusting the other charts.
 ## Things to change per environment
 
 1. **Project selection:** the `AppInsightsResources` parameter has no default. Pick your Application Insights resource(s) in the dropdown after import. To pre-select one, edit `selected = false` in the parameter's query to `selected = id =~ '<resource id>'`.
-2. **Resource Graph scope:** `ops-alert-rules` and `ops-model-inventory` list every alert rule and model deployment in the selected subscriptions. Add `| where resourceGroup =~ '<rg>'` to narrow them.
+2. **Scope of the inventory panels:** `ops-alert-rules` lists every alert rule in the selected subscriptions. Add `| where resourceGroup =~ '<rg>'` to narrow it. `ops-model-inventory` lists one Foundry account at a time. Change the `FoundryAccount` parameter to switch accounts, and add a `resourceGroup` filter to the parameter's query to shorten the list.
 3. **Prices:** edit the `datatable` in the three cost queries, and `MONTHLY_BUDGET_USD` (50.0) in the burn-down query.
 4. **Alert thresholds in the self-check:** the 15-minute window, "errors greater than 0" and "p95 greater than 30 s" mirror the two deployed alert rules. Keep them in sync.
 5. **Quality and safety note:** it points at the portal Evaluations and Red team panes. Adjust the cadence and wording to your process.
@@ -177,4 +179,4 @@ Check these before trusting the other charts.
 - **Cost covers only three models.** See the pricing note above. The prices were checked on 2026-10-08 for Global Standard deployments. Recheck them for your region and deployment type before using them for budgets.
 - **TTFB is a proxy.** See section 2.
 - **Quality and safety isn't live.** Use the Foundry portal Evaluations and Red team views for current results.
-- **Validation status.** All 26 KQL queries and the 3 Resource Graph queries were executed against a live environment and ran without errors. Re-run them against your own environment after import, because results depend on your data. See the query reference.
+- **Validation status.** All 26 KQL queries, the Resource Graph queries and the model-inventory REST call were executed against a live environment and ran without errors. The workbook was also deployed as a separate workbook and the deployed definition matched this file. Re-run the panels against your own environment after import, because results depend on your data. See the query reference.

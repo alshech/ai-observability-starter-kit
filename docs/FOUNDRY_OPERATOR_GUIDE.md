@@ -14,7 +14,7 @@ How an operator should use the [Foundry Operator Dashboard](FOUNDRY_OPERATOR_WOR
 | Prices and budget | Update the price `datatable` and `MONTHLY_BUDGET_USD` in the cost queries. |
 | Alerts | Create scheduled-query alerts that mirror the "Live self-check" (failed runs, p95 latency). Route them to an action group with an owner and a runbook link. |
 | Save | Save a copy to a shared resource group so the whole team uses one version. Pin it in the Azure portal dashboard. |
-| Access | Operators need **Monitoring Reader** (or **Log Analytics Reader**) on the Application Insights resource, and **Reader** on the subscription for the Resource Graph panels. |
+| Access | Operators need **Monitoring Reader** (or **Log Analytics Reader**) on the Application Insights resource. They also need **Reader** on the subscription for the alert-rules panel and the pickers, and **Reader** on the Foundry account for the model inventory. |
 
 ## 2. Trust the data first
 
@@ -44,7 +44,7 @@ Always check **Telemetry and evaluation health** before reading any other panel.
 ### Weekly (30 minutes)
 1. Set the range to **7 days**. Review latency and token trends per model.
 2. **Cost:** month-to-date versus budget. Reconcile with Azure Cost Management, and add prices for any new model so it isn't left out. The cost table flags unpriced models.
-3. **Model inventory:** check versions, SKUs and capacity against what is approved. Watch for models nearing retirement.
+3. **Model inventory:** pick the Foundry account in the parameter bar, then check versions, SKUs and capacity against what is approved. Watch for models nearing retirement.
 4. **Alert rules:** confirm all are enabled and the action groups still route to the right owners.
 5. **Quality and safety:** open the Foundry portal **Evaluations** and **Red team** tabs. The workbook section is static text. Run a red-team scan from the portal and record the attack success rate against your agreed limit.
 6. Review long conversations in **Sessions**: very high turn counts suggest loops.
