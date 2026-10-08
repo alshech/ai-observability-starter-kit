@@ -124,7 +124,9 @@ Cost is `tokens / 1000 * price_per_1k`, using an inline `datatable` of list pric
 | gpt-4.1-mini | 0.0004 | 0.0016 |
 | gpt-5-mini | 0.00025 | 0.002 |
 
-These are estimates. Reconcile with Azure Cost Management. Spans report versioned model names (for example `gpt-4.1-mini-2025-04-14`). The queries strip the trailing date so they match the price table. A model that isn't in the table gets a null price and is left out of the cost chart and budget. The cost table flags it with `price_listed = NO - add to price table`.
+These are Azure list prices in USD for **Global Standard** deployments, checked against the Azure Retail Prices API on 2026-10-08 (identical in eastus2, swedencentral and westus3). Data Zone and regional deployments cost about 10% more, and Batch costs about half. Recheck the prices before using them for a budget, because they change.
+
+These are estimates. Reconcile with Azure Cost Management. The queries price every input token at the standard input rate. Cached input tokens are billed lower, so an estimate can run above the invoice. Spans report versioned model names (for example `gpt-4.1-mini-2025-04-14`). The queries strip the trailing date so they match the price table. A model that isn't in the table gets a null price and is left out of the cost chart and budget. The cost table flags it with `price_listed = NO - add to price table`.
 
 ### Hidden failures
 A successful `invoke_agent` run can still contain a failed tool or model call that the agent recovered from or ignored. Alert rules that only check `requests.success` can't see this.
@@ -172,7 +174,7 @@ Check these before trusting the other charts.
 ## Known limitations and gotchas
 
 - **Hidden-failures table counts distinct runs.** `hidden_failures` is `dcount(operation_Id)`, so a run with several failed children counts once. Any failed dependency counts, not only model and tool calls.
-- **Cost covers only three models.** See the pricing note above. Verify the prices against the current Azure price sheet for your region and deployment type before using them for budgets.
+- **Cost covers only three models.** See the pricing note above. The prices were checked on 2026-10-08 for Global Standard deployments. Recheck them for your region and deployment type before using them for budgets.
 - **TTFB is a proxy.** See section 2.
 - **Quality and safety isn't live.** Use the Foundry portal Evaluations and Red team views for current results.
 - **Validation status.** All 26 KQL queries and the 3 Resource Graph queries were executed against a live environment and ran without errors. Re-run them against your own environment after import, because results depend on your data. See the query reference.

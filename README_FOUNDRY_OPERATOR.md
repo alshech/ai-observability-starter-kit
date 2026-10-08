@@ -60,7 +60,7 @@ See [`docs/FOUNDRY_OPERATOR_WORKBOOK.md`](docs/FOUNDRY_OPERATOR_WORKBOOK.md) for
 The workbook is generic, so a few items need your values:
 
 - [ ] **Budget:** set `MONTHLY_BUDGET_USD` in the `cost-budget-burndown` query to your approved monthly budget. It ships with 50.
-- [ ] **Prices:** the price table in the cost queries covers three models and uses illustrative prices. Check them against the current Azure price sheet for your region and deployment type, and add every model you deploy. The cost table flags unpriced models in its `price_listed` column.
+- [ ] **Prices:** the price table in the cost queries covers three models (gpt-4o-mini, gpt-4.1-mini, gpt-5-mini). The prices are Azure list prices for Global Standard deployments, checked on 2026-10-08. Update them if you use Data Zone or regional deployments (about 10% more) or Batch (about half), and add every model you deploy. The cost table flags unpriced models in its `price_listed` column.
 - [ ] **Thresholds:** the suggested values are starting points. Agree them against your own SLOs. See section 5 of the operator guide.
 - [ ] **Escalation text:** the ownership and escalation notes in the text blocks are generic. Replace them with your teams, channels and runbooks.
 - [ ] **Alert rules:** the workbook shows alert rules but doesn't create them. Create scheduled-query alerts for the signals you need. The `ops-alert-self-check` panel is a starting point.
@@ -79,7 +79,7 @@ The full list is in the [per-environment section](docs/FOUNDRY_OPERATOR_WORKBOOK
 
 ## Things to know
 
-- **Estimates, not invoices.** Cost is calculated from token counts and the price table. Reconcile with Azure Cost Management.
+- **Estimates, not invoices.** Cost is calculated from token counts and the price table. Cached input tokens are billed lower than the table assumes, so an estimate can run above the invoice. Reconcile with Azure Cost Management.
 - **Three panels ignore the time range.** The self-check (last 15 minutes), the budget burn-down (month to date) and the usage anomaly check (24 hours against 7 days) use fixed windows.
 - **Hidden failures matter.** An agent can report `success=true` while its model calls fail. It then shows 0% errors in the error panels. Check the hidden-failures panels.
 - **Quiet is not healthy.** A system with no traffic looks the same as an outage in the ingestion freshness panel.
@@ -94,4 +94,4 @@ All 26 KQL queries and the 3 Azure Resource Graph queries were executed read-onl
 
 ## Support
 
-Questions or changes to the workbook: contact the team that delivered this package.
+Questions or changes to the workbook: contact Eran Alshech.

@@ -43,7 +43,7 @@ Always check **Telemetry and evaluation health** before reading any other panel.
 
 ### Weekly (30 minutes)
 1. Set the range to **7 days**. Review latency and token trends per model.
-2. **Cost:** month-to-date versus budget. Reconcile with Azure Cost Management, and add prices for any new model so it isn't silently dropped.
+2. **Cost:** month-to-date versus budget. Reconcile with Azure Cost Management, and add prices for any new model so it isn't left out. The cost table flags unpriced models.
 3. **Model inventory:** check versions, SKUs and capacity against what is approved. Watch for models nearing retirement.
 4. **Alert rules:** confirm all are enabled and the action groups still route to the right owners.
 5. **Quality and safety:** open the Foundry portal **Evaluations** and **Red team** tabs. The workbook section is static text. Run a red-team scan from the portal and record the attack success rate against your agreed limit.
@@ -111,7 +111,7 @@ Rate and percentile alerts need at least 100 eligible events per window. Below t
 
 ## 7. Known limitations to tell operators about
 
-- Cost covers only the models in the price table. Verify the prices for your region and deployment type.
+- Cost covers only the models in the price table. The prices were checked on 2026-10-08 for Global Standard deployments. Recheck them for your region and deployment type.
 - Latency is end-to-end per model call, not time to first token.
 - The "Quality and safety" section isn't live.
 - The hidden-failures table counts distinct runs, but any failed dependency counts, not only model and tool calls.

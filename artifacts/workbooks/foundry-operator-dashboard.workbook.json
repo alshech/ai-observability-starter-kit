@@ -219,7 +219,7 @@
     {
       "type": 1,
       "content": {
-        "json": "---\n## 2️⃣ Latency (TTFB)\nEnd-to-end agent latency (full request) and model-call latency (our closest proxy for streaming responsiveness)."
+        "json": "---\n## 2️⃣ Latency (TTFB)\nEnd-to-end agent latency (full request) and model-call latency (the closest proxy available for streaming responsiveness)."
       },
       "name": "section-latency-header"
     },
@@ -612,7 +612,7 @@
     {
       "type": 1,
       "content": {
-        "json": "ℹ️ **Cost figures are estimates** using public pay-as-you-go list prices as of writing (`gpt-4o-mini`: $0.00015/$0.0006 per 1K in/out tokens; `gpt-4.1-mini`: $0.0004/$0.0016; `gpt-5-mini`: $0.00025/$0.002). Reconcile against **Azure Cost Management** for actuals; edit `pricing` / `MONTHLY_BUDGET_USD` above for your rates.",
+        "json": "ℹ️ **Cost figures are estimates** using Azure list prices for **Global Standard** deployments, checked 2026-10-08 (`gpt-4o-mini`: $0.00015/$0.0006 per 1K in/out tokens; `gpt-4.1-mini`: $0.0004/$0.0016; `gpt-5-mini`: $0.00025/$0.002). Data Zone and regional deployments cost about 10% more, and cached input tokens bill lower, so an estimate can run above the invoice. Reconcile against **Azure Cost Management** for actuals; edit `pricing` / `MONTHLY_BUDGET_USD` above for your rates.",
         "style": "info"
       },
       "name": "cost-budget-note"
@@ -637,7 +637,7 @@
     {
       "type": 1,
       "content": {
-        "json": "---\n## 🔟 Hidden Failures (Parent-Child Dependency Failures)\nA **successful** `invoke_agent` run can still contain a **failed** tool or model call underneath it — the agent may catch and recover from it, or silently ignore it. Our basic alert rules only check top-level `requests.success`, so **they cannot see these**. This section surfaces runs that reported success but had at least one failed child dependency underneath, so operators can decide whether \"recovered\" failures also need attention.",
+        "json": "---\n## 🔟 Hidden Failures (Parent-Child Dependency Failures)\nA **successful** `invoke_agent` run can still contain a **failed** tool or model call underneath it — the agent may catch and recover from it, or silently ignore it. Alert rules that only check top-level `requests.success` **cannot see these**. This section surfaces runs that reported success but had at least one failed child dependency underneath, so operators can decide whether \"recovered\" failures also need attention.",
         "style": "warning"
       },
       "name": "section-hidden-failures-header"

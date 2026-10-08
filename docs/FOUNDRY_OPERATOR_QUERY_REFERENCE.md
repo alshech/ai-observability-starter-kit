@@ -63,7 +63,7 @@ let pricing = datatable(model:string, in_per_1k:real, out_per_1k:real)
 ];
 ```
 
-Prices are USD per 1,000 tokens and are illustrative. A model that isn't listed gets null prices. The cost table flags it with `price_listed = NO - add to price table`, but the time chart and the budget panel leave it out.
+Prices are USD per 1,000 tokens. They are the Azure list prices for **Global Standard** deployments, checked against the Azure Retail Prices API on 2026-10-08. They were identical in eastus2, swedencentral and westus3. Data Zone and regional deployments cost about 10% more, and Batch costs about half, so edit the table if you deploy that way. The queries price every input token at the standard input rate. Cached input tokens are billed at a lower rate, so the estimate can run above the invoice. A model that isn't listed gets null prices. The cost table flags it with `price_listed = NO - add to price table`, but the time chart and the budget panel leave it out.
 
 ---
 
