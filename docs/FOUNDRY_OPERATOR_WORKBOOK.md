@@ -5,7 +5,7 @@ An Azure Monitor **workbook** that gives operators one page for the health, cost
 - **Workbook definition:** [`artifacts/workbooks/foundry-operator-dashboard.workbook.json`](../artifacts/workbooks/foundry-operator-dashboard.workbook.json)
 - **Query reference:** [`FOUNDRY_OPERATOR_QUERY_REFERENCE.md`](FOUNDRY_OPERATOR_QUERY_REFERENCE.md) has the full KQL of every query with a step-by-step explanation.
 - **Operator guide:** [`FOUNDRY_OPERATOR_GUIDE.md`](FOUNDRY_OPERATOR_GUIDE.md) explains how to use it day to day.
-- **Origin:** exported from the starter-kit reference environment, with environment-specific IDs removed.
+- **Origin:** exported from a reference Foundry environment, with environment-specific IDs removed.
 - **Contents:** 56 items. About 30 are KQL panels, and the rest are headings, notes and parameters.
 
 > The definition is stored as a workbook "gallery template" JSON (the `serializedData` value), so it can be imported in the portal or deployed from an ARM/Bicep template.
@@ -132,7 +132,7 @@ A successful `invoke_agent` run can still contain a failed tool or model call th
 - **Overall hidden failure rate:** distinct traces with a failed child, divided by all successful runs.
 
 ### 9. Quality and safety (static)
-A text note, not a live query. Evaluation scores and red-team results come from the Foundry Evaluations service, not from the telemetry in Application Insights. The note says where to find current results (Foundry portal Evaluations and Red team panes, and `artifacts/redteam.json` written by `scripts/12-red-team-v2.py`) and suggests a cadence.
+A text note, not a live query. Evaluation scores and red-team results come from the Foundry Evaluations service, not from the telemetry in Application Insights. The note says where to find current results (Foundry portal Evaluations and Red team panes) and suggests a cadence.
 
 ### 10. Operational depth
 | Panel | Source | What it shows |
@@ -159,7 +159,7 @@ Check these before trusting the other charts.
 - **Known challenges and mitigations:** missing child spans, portal rollup lag, evaluation cadence, sensitive content in traces, alert noise, evaluator scale differences, preview or SDK changes.
 - **KPI thresholds and ownership:** illustrative warn and page thresholds per KPI, with an owner and an escalation flow.
 - **Open governance decisions:** telemetry content, data controls, SLOs, ownership, routing, release authority, standardization.
-- **Footer:** pointers to `scripts\validate-deployment.ps1`, `scripts\13-telemetry-kql.py` and `scripts\run-e2e.ps1`.
+- **Footer:** pointers to Application Insights Logs, Azure Monitor Alerts and the Foundry Evaluations and Red team panes.
 
 ## Things to change per environment
 
@@ -167,7 +167,7 @@ Check these before trusting the other charts.
 2. **Resource Graph scope:** `ops-alert-rules` and `ops-model-inventory` list every alert rule and model deployment in the selected subscriptions. Add `| where resourceGroup =~ '<rg>'` to narrow them.
 3. **Prices:** edit the `datatable` in the three cost queries, and `MONTHLY_BUDGET_USD` (50.0) in the burn-down query.
 4. **Alert thresholds in the self-check:** the 15-minute window, "errors greater than 0" and "p95 greater than 30 s" mirror the two deployed alert rules. Keep them in sync.
-5. **Quality and safety note:** it points at the portal and the v2 script. Adjust the cadence and wording to your process.
+5. **Quality and safety note:** it points at the portal Evaluations and Red team panes. Adjust the cadence and wording to your process.
 
 ## Known limitations and gotchas
 

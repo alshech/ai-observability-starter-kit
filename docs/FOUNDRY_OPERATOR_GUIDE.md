@@ -46,7 +46,7 @@ Always check **Telemetry and evaluation health** before reading any other panel.
 2. **Cost:** month-to-date versus budget. Reconcile with Azure Cost Management, and add prices for any new model so it isn't silently dropped.
 3. **Model inventory:** check versions, SKUs and capacity against what is approved. Watch for models nearing retirement.
 4. **Alert rules:** confirm all are enabled and the action groups still route to the right owners.
-5. **Quality and safety:** open the Foundry portal **Evaluations** and **Red team** tabs. The workbook section is a static snapshot. Run `scripts/12-red-team-v2.py --max-asr 0.20` and record the attack success rate.
+5. **Quality and safety:** open the Foundry portal **Evaluations** and **Red team** tabs. The workbook section is static text. Run a red-team scan from the portal and record the attack success rate against your agreed limit.
 6. Review long conversations in **Sessions**: very high turn counts suggest loops.
 
 ### After every release
@@ -116,6 +116,6 @@ Rate and percentile alerts need at least 100 eligible events per window. Below t
 - The "Quality and safety" section isn't live.
 - The hidden-failures table counts distinct runs, but any failed dependency counts, not only model and tool calls.
 - Sessions are traces. A conversation that spans several traces shows as several sessions.
-- When we tested, the red-team portal's **Create** picker listed prompt agents only. Run hosted agents with `scripts/12-red-team-v2.py --hosted`. The results appear in the portal afterwards. Check the portal again, as this may change.
+- When we tested, the red-team portal's **Create** picker listed prompt agents only, not hosted agents. Check whether your portal version lists your hosted agents. If it doesn't, red-team a prompt agent that uses the same model and instructions, or use the Foundry red-teaming SDK to target the hosted agent.
 
 See [Known limitations and gotchas](FOUNDRY_OPERATOR_WORKBOOK.md#known-limitations-and-gotchas) for the full list.

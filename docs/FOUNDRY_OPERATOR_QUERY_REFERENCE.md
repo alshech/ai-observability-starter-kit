@@ -584,4 +584,4 @@ requests
 - **Log Analytics workspace:** if the resource is workspace-based, the tables are `AppRequests` and `AppDependencies`, with columns such as `Name`, `Success`, `DurationMs`, `OperationId` and `Properties`. The queries need translating.
 - **Resource Graph panels** run in **Azure Resource Graph Explorer**, not in Logs.
 - **Alerts:** to alert from a panel, copy the query into a scheduled-query rule and add a threshold. Use the `ops-alert-self-check` logic as the starting point.
-- **Scripts:** `scripts/13-telemetry-kql.py` runs a smaller set of test-case queries (volume, latency percentiles and similar) through the Logs Query API and writes `artifacts/telemetry.json`. It doesn't run these panels.
+- **Scripts and APIs:** the same KQL runs through the Logs Query API (for example the `azure-monitor-query` Python package, `LogsQueryClient.query_resource`) against an Application Insights resource id.

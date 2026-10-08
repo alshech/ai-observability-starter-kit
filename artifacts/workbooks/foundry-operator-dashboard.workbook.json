@@ -679,7 +679,7 @@
     {
       "type": 1,
       "content": {
-        "json": "---\n## 9⃣⃣ Quality & Safety\n> ℹ️ **Why static, not live?** Continuous evaluation scores and red-team scan results are produced by the Azure AI Foundry **Evaluations** service, not by the OpenTelemetry pipeline that feeds this Application Insights resource, so they cannot be queried live with KQL here. For current scores use the **Foundry portal → Evaluations** and **Red team** panes.\n\n| Check | Where to look | Suggested cadence |\n|---|---|---|\n| Continuous evaluation | Foundry portal → Evaluations (rule created by `scripts\\10-continuous-eval.py`: `intent_resolution`, `tool_call_accuracy`, `violence`) | Review weekly; investigate any downward trend |\n| Red-team scan | Foundry portal → Red team, or `artifacts\\redteam.json` written by `scripts\\12-red-team-v2.py` | Before every release and at least monthly |\n\nA **failed** red-team attempt means the attack technique got the agent to violate the tested policy. The attack success rate (ASR) is failed attempts divided by evaluable attempts. Treat a rising ASR across scans as a regression signal, not a one-time score.\n\n**Run:** `python scripts\\12-red-team-v2.py --max-asr 0.20` (exit code 1 when the gate fails). Add `--hosted` to target a hosted agent instead of a temporary prompt agent."
+        "json": "---\n## 9⃣⃣ Quality & Safety\n> ℹ️ **Why static, not live?** Continuous evaluation scores and red-team scan results are produced by the Azure AI Foundry **Evaluations** service, not by the OpenTelemetry pipeline that feeds this Application Insights resource, so they cannot be queried live with KQL here. For current scores use the **Foundry portal → Evaluations** and **Red team** panes.\n\n| Check | Where to look | Suggested cadence |\n|---|---|---|\n| Continuous evaluation | Foundry portal → Evaluations (your continuous evaluation rules, for example `intent_resolution`, `tool_call_accuracy`, `violence`) | Review weekly; investigate any downward trend |\n| Red-team scan | Foundry portal → Red team | Before every release and at least monthly |\n\nA **failed** red-team attempt means the attack technique got the agent to violate the tested policy. The attack success rate (ASR) is failed attempts divided by evaluable attempts. Treat a rising ASR across scans as a regression signal, not a one-time score.\n\nRun a red-team scan from the portal and record the attack success rate against your agreed limit."
       },
       "name": "section-quality-header"
     },
@@ -879,7 +879,7 @@
     {
       "type": 1,
       "content": {
-        "json": "**Evaluation coverage** and **task completion / intent / groundedness / RAG quality** are produced by the Azure AI Foundry **Evaluations** service (for example the continuous eval rule created by `scripts\\10-continuous-eval.py`), not by this OpenTelemetry pipeline — so they can't be queried live with KQL here. Check the **Foundry portal → Evaluations** pane for live coverage % and scores. **RAG/retrieval KPIs are N/A** for the starter-kit agents, which use function-calling tools, not a retrieval/RAG pattern.\n\n**Data handling:** prompt and completion content is captured in spans only when `ENABLE_SENSITIVE_DATA=true`; keep it `false` in production. Access to this workbook and the underlying Log Analytics workspace is governed by RBAC on the resource group."
+        "json": "**Evaluation coverage** and **task completion / intent / groundedness / RAG quality** are produced by the Azure AI Foundry **Evaluations** service (for example your continuous evaluation rules), not by this OpenTelemetry pipeline — so they can't be queried live with KQL here. Check the **Foundry portal → Evaluations** pane for live coverage % and scores. **RAG/retrieval KPIs are N/A** for the agents, which use function-calling tools, not a retrieval/RAG pattern.\n\n**Data handling:** prompt and completion content is captured in spans only when `ENABLE_SENSITIVE_DATA=true`; keep it `false` in production. Access to this workbook and the underlying Log Analytics workspace is governed by RBAC on the resource group."
       },
       "name": "telemetry-eval-coverage-note"
     },
@@ -908,7 +908,7 @@
     {
       "type": 1,
       "content": {
-        "json": "---\n### 🔧 Related tools\n- Infrastructure / RBAC / alert checks: `scripts\\validate-deployment.ps1` (26 automated checks)\n- Raw KQL export: `scripts\\13-telemetry-kql.py` → `artifacts\\telemetry.json`\n- Re-seed test traffic: `scripts\\run-e2e.ps1 -SkipPhases \"1,2,3,4,5,8,9,10,11,12,13\"`\n- Batch evaluation / red-team results: Foundry portal **Evaluations** pane"
+        "json": "---\n### 🔧 Related tools\n- Raw telemetry: Application Insights → **Logs** (run the queries in the query reference directly)\n- Alert rules and action groups: Azure Monitor → **Alerts**\n- Batch evaluation / red-team results: Foundry portal **Evaluations** and **Red team** panes"
       },
       "name": "footer"
     }
