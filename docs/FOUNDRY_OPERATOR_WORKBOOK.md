@@ -3,6 +3,7 @@
 An Azure Monitor **workbook** that gives operators one page for the health, cost and risk of Foundry agents. It reads the OpenTelemetry data the agents send to Application Insights.
 
 - **Workbook definition:** [`artifacts/workbooks/foundry-operator-dashboard.workbook.json`](../artifacts/workbooks/foundry-operator-dashboard.workbook.json)
+- **Query reference:** [`FOUNDRY_OPERATOR_QUERY_REFERENCE.md`](FOUNDRY_OPERATOR_QUERY_REFERENCE.md) has the full KQL of every query with a step-by-step explanation.
 - **Operator guide:** [`FOUNDRY_OPERATOR_GUIDE.md`](FOUNDRY_OPERATOR_GUIDE.md) explains how to use it day to day.
 - **Origin:** exported from the starter-kit reference environment, with environment-specific IDs removed.
 - **Contents:** 56 items. About 30 are KQL panels, and the rest are headings, notes and parameters.
