@@ -17,11 +17,13 @@ services:
                     cpu: "0.25"
                     memory: 0.5Gi
             deployments:
+                # gpt-4o-mini (2024-07-18) retired for new deployments on 2026-10-01;
+                # substituting gpt-4.1-mini as the baseline model for this agent.
                 - model:
                     format: OpenAI
-                    name: gpt-5-mini
-                    version: "2025-08-07"
-                  name: gpt-5-mini
+                    name: gpt-4.1-mini
+                    version: "2025-04-14"
+                  name: gpt-4o-mini
                   sku:
                     capacity: 30
                     name: GlobalStandard
