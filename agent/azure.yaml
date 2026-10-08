@@ -19,9 +19,9 @@ services:
             deployments:
                 - model:
                     format: OpenAI
-                    name: gpt-4o-mini
-                    version: "2024-07-18"
-                  name: gpt-4o-mini
+                    name: gpt-5-mini
+                    version: "2025-08-07"
+                  name: gpt-5-mini
                   sku:
                     capacity: 30
                     name: GlobalStandard
@@ -58,6 +58,32 @@ services:
                 resources:
                     cpu: "0.25"
                     memory: 0.5Gi
+    agent-framework-agent-notools:
+        project: src/agent-framework-agent-notools
+        host: azure.ai.agent
+        language: docker
+        docker:
+            remoteBuild: true
+        config:
+            container:
+                resources:
+                    cpu: "0.25"
+                    memory: 0.5Gi
+    agent-framework-agent-hardened:
+        project: src/agent-framework-agent-hardened
+        host: azure.ai.agent
+        language: docker
+        docker:
+            remoteBuild: true
+        kind: hosted
+        name: agent-framework-agent-hardened
+        protocols:
+            - protocol: responses
+              version: 1.0.0
+        env:
+            AZURE_AI_MODEL_DEPLOYMENT_NAME: ${MODEL_DEPLOYMENT_NAME}
+            ENABLE_INSTRUMENTATION: 'true'
+            ENABLE_SENSITIVE_DATA: 'false'
 infra:
     provider: bicep
     path: ./infra
